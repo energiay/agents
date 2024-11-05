@@ -43,6 +43,10 @@ function fillGroup(group, ssql) {
  * @return {string}
  */
 function getSql(settings) {
+    if (settings.sql != "") {
+        return settings.sql
+    }
+
     if (settings.position_common_id != "") {
         return (
             "SELECT cs.id \n" +
