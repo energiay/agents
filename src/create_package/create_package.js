@@ -30,7 +30,7 @@ function parseOptJson(json, defaultValue) {
 
 
 /**
- * Получить директорию
+ * Получить директорию из полного пути файла
  * @param {string} file
  * @return {string}
  */
@@ -70,6 +70,7 @@ function getPathToFile(file) {
     var hour = StrInt(Hour(curDate), 2)
     var minute = StrInt(Minute(curDate), 2)
     var second = StrInt(Second(curDate), 2)
+    var ms = GetCurTicks() // кол-во мс с запуска операционной системы
 
     return (
         settings.file +
@@ -79,7 +80,8 @@ function getPathToFile(file) {
         "_" + hour +
         "_" + minute +
         "_" + second +
-        "_" + GetCurTicks() + ".zip"
+        "_" + ms +
+        ".zip"
     )
 }
 
@@ -101,9 +103,7 @@ function getParams(settings) {
         return params
     }
 
-
-    // получаем путь для сохранения файла
-    //var path = "x-local://wt/web/backup/backup_" + tools.date_str() + ".zip"
+    // полный путь файла + проверяем существование пути
     params.file = getPathToFile(settings.file)
     if (params.file == "") {
         params.success = false
@@ -121,20 +121,25 @@ function getParams(settings) {
  * @param {object} settings
 */
 function run(settings) {
+    // конвертируем параметры
+    // и проверяем корректность этих параметров
     var params = getParams(settings)
     if (!params.success) {
         addLog(params.error)
         return
     }
 
+    // создаем бэкап-пакет
     var packageObjects = tools.new_doc_by_name("package_objects")
     var child = packageObjects.TopElem.AddChild()
 
+    // добавляем в бэкап-пакет данные
     var id
     for (id in params.targets) {
         child.objects.ObtainChildByKey(id)
     }
 
+    // сохраняем бэкап-пакет на HDD
     var backup = ArrayOptFirstElem(packageObjects.TopElem.package_object)
     tools.create_list_package(params.file, backup)
 }
@@ -147,7 +152,7 @@ try {
     var threads = parseOptJson(Param.threads, [])
 
     var thread
-    for(thread in threads) {
+    for (thread in threads) {
         if (thread.enabled != "true") {
             continue
         }
