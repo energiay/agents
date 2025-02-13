@@ -133,7 +133,7 @@ function run(settings) {
     var packageObjects = tools.new_doc_by_name("package_objects")
     var child = packageObjects.TopElem.AddChild()
 
-    // добавляем в бэкап-пакет данные
+    // добавляем данные в бэкап-пакет
     var id
     for (id in params.targets) {
         child.objects.ObtainChildByKey(id)
