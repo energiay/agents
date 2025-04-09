@@ -6,7 +6,7 @@
 function addLog(value, name) {
     var sLogName = name
     if (sLogName == undefined) {
-        sLogName = "sc_load_trenings_of_users"
+        sLogName = "sc_load_learnings_of_users"
     }
 
     EnableLog(sLogName)
@@ -14,19 +14,98 @@ function addLog(value, name) {
 }
 
 /**
+ * Получить условие для глубины поиска (в днях)
+ * @param {int} days
+ * @return {string}
+ */
+function getDaysWhere(days) {
+    if (days == "") {
+        return ""
+    }
+
+    return (
+        "stat.created_at >= CAST(DATEADD(DAY, -" + days + ", GETDATE()) AS DATE)"
+    )
+}
+
+/**
+ * Получить условие поиска по одному тренингу
+ * @param {string} id
+ * @return {string}
+ */
+function getTrainingWhere(id) {
+    if (id == "") {
+        return ""
+    }
+
+    return (
+        "stat.id in ('" + id + "')"
+    )
+}
+
+/**
+ * Получить условие поиска по одному сотруднику
+ * @param {string} code - таб№ сотрудника
+ * @return {string}
+ */
+function getUserWhere(code) {
+    if (code == "") {
+        return ""
+    }
+
+    return (
+        "users.username in ('" + code + "')"
+    )
+}
+
+/**
+ * Получить условия для выборки тренингов
+ * @param {object} setting
+ * @property {int} days - кол-во дней
+ * @property {string} training_id - идентификатор тренинга в Skill Cup
+ * @property {string} code - таб№ сотрудника
+ * @return {string}
+ */
+function getWhere() {
+    var where = []
+
+    var days = getDaysWhere(setting.days)
+    if (days != "") {
+        where.push(days)
+    }
+
+    var training = getTrainingWhere(setting.training_id)
+    if (training != "") {
+        where.push(training)
+    }
+
+    var user = getUserWhere(setting.code)
+    if (user != "") {
+        where.push(user)
+    }
+
+    if (ArrayOptFirstElem(where) == undefined) {
+        return ""
+    }
+
+    return "WHERE " + where.join("\nAND ")
+}
+
+/**
  * Получение SC тренингов
  * @return {array}
  */
-function getTrainings() {
+function getTrainings(setting) {
+    var where = getWhere(setting)
+
     var query = (
+        "\n" +
         "SELECT \n" +
         "   users.username AS user_code,  \n" +
         "   stat.*  \n" +
         "FROM SC_Stats AS stat  \n" +
         "LEFT JOIN sc_users AS users ON users.id = stat.user_id  \n" +
-        //"WHERE users.username = '413864'"
-        "WHERE users.username = '494467'"
-        //"  AND stat.id = 'bb2c797d-05ef-46cc-9963-18817f1d8422'"
+        where
     )
 
     var sql_lib = OpenCodeLib('x-local://wt/web/custom_projects/libs/sql_lib.js')
@@ -67,24 +146,24 @@ function getLearning(training, user, course) {
         return null
     }
 
-    addLog("")
-    addLog(query)
-    //addLog(tools.object_to_text(learning, 'json'))
+    //addLog("")
+    //addLog(query)
 
     return learning
 }
 
 /**
- * Получить TopElem карточки пользователя
+ * Получить сотрудника из БД
  * @param {string} code - таб№ сотрудника
- * @return {XmElem}
+ * @return {XmElem || null}
  */
-function getUser(code) {
-    // TODO: тут буде оптимизация, когда агент начнет долго работать
-    // добавлю кеширование для карточек пользователей
+function getUserFormBd(code) {
+    var query = (
+        "SELECT id \n" +
+        "FROM collaborators \n" +
+        "WHERE is_dismiss = 0 AND code = " + SqlLiteral(code)
+    )
 
-    // найти сотрудника в БД
-    var query = "SELECT id FROM collaborators WHERE code = " + SqlLiteral(code)
     var users = XQuery("sql: " + query)
 
     var user = ArrayOptFirstElem(users)
@@ -97,24 +176,47 @@ function getUser(code) {
         return null
     }
 
-    //addLog("")
-    //addLog(query)
-    //addLog(tools.object_to_text(user, 'json'))
-    return {
-        id: Int(user.id),
-        card: OpenDoc(UrlFromDocID(Int(user.id))).TopElem,
-    }
+    return user
 }
 
 /**
- * Получить TopElem карточки курса из тренинга SC
- * @param {object} learning
- * @return {object || null}
+ * Получить TopElem карточки пользователя
+ * @param {string} code - таб№ сотрудника
+ * @return {object}
  */
-function getCourse(learning) {
-    // TODO: тут будет оптимизация, когда агент начнет долго работать
-    // добавлю кеширование для карточек курса
+function getUser(code) {
+    // вернуть сотрудника из кэша, если он там есть
+    if (cacheUsers.GetOptProperty(code) != undefined) {
+        return cacheUsers.GetOptProperty(code)
+    }
 
+    // формируем ответ функции - ошибочный
+    var cache = {success: false}
+    var user = getUserFormBd(code)
+    if (user == null) {
+        cacheUsers[code] = cache
+        return cache
+    }
+
+    // формируем ответ функции - успешный
+    cache = {
+        success: true,
+        id: Int(user.id),
+        card: OpenDoc(UrlFromDocID(Int(user.id))).TopElem,
+    }
+
+    // Сохранить сотрудника в кэш по таб№
+    cacheUsers[code] = cache
+
+    return cache
+}
+
+/**
+ * Получить курс из БД
+ * @param {string} code - таб№ сотрудника
+ * @return {XmElem || null}
+ */
+function getCourseFormBd(learning) {
     // найти курс в БД
     var code = "SC_" + learning.id
     var query = "SELECT id FROM courses WHERE code = " + SqlLiteral(code)
@@ -130,14 +232,42 @@ function getCourse(learning) {
         return null
     }
 
-    //addLog("")
-    //addLog(query)
-    //addLog(tools.object_to_text(course, 'json'))
-    return {
+    return course
+}
+
+/**
+ * Получить TopElem карточки курса из тренинга SC
+ * @param {object} learning
+ * @return {object || null}
+ */
+function getCourse(learning) {
+    // вернуть курс из кэша, если он там есть
+    if (cacheCourses.GetOptProperty(learning.id) != undefined) {
+        return cacheCourses.GetOptProperty(learning.id)
+    }
+
+    // формируем ответ функции - ошибочный
+    var cache = {success: false}
+
+    var course = getCourseFormBd(learning)
+    if (course == null) {
+        cacheCourses[learning.id] = cache
+        return cache
+    }
+
+    // формируем ответ функции - успешный
+    cache = {
+        success: true,
         id: Int(course.id),
         card: OpenDoc(UrlFromDocID(Int(course.id))).TopElem,
     }
+
+    // Сохранить курс в кэш по идентификатору
+    cacheCourses[learning.id] = cache
+
+    return cache
 }
+
 
 /**
  * Проставить поля в карточку завершенного курса
@@ -176,12 +306,12 @@ function fillTrainingFields(cardLearning, user, course, training) {
  */
 function loadLearning(training) {
     var user = getUser(training.user_code)
-    if (user == null) {
+    if (!user.success) {
         return null
     }
 
     var course = getCourse(training)
-    if (course == null) {
+    if (!course.success) {
         return null
     }
 
@@ -190,10 +320,10 @@ function loadLearning(training) {
     if (learning == null) {
         cardLearning = OpenNewDoc("x-local://wtv/wtv_learning.xmd")
         cardLearning.BindToDb()
-        addLog( "new " + cardLearning.DocID)
+        //addLog( "new " + cardLearning.DocID)
     } else {
         cardLearning = OpenDoc(UrlFromDocID(Int(learning.id)))
-        addLog( "exist " + cardLearning.DocID)
+        //addLog( "exist " + cardLearning.DocID)
     }
 
     cardLearning = fillTrainingFields(cardLearning, user, course, training)
@@ -205,8 +335,8 @@ function loadLearning(training) {
 /**
  * Главная функция
  */
-function load() {
-    var trainings = getTrainings()
+function load(setting) {
+    var trainings = getTrainings(setting)
 
     var training
     for (training in trainings) {
@@ -220,7 +350,18 @@ function load() {
 // entry point
 try {
     addLog("begin")
-    load()
+
+    var cacheUsers = {}
+    var cacheCourses = {}
+
+    var setting = {
+        days: OptInt(Trim(Param.load_days), ""),
+        training_id: Trim(Param.load_training),
+        code: Trim(Param.load_code),
+    }
+
+    load(setting)
+
     addLog("end")
 } catch (err) {
     addLog("ERROR: " + err)
