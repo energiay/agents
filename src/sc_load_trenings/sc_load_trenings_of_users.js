@@ -95,21 +95,22 @@ function getWhere() {
  * Получение SC тренингов
  * @return {array}
  */
-function getTrainings(setting) {
+function getWtTrainings(setting) {
     var where = getWhere(setting)
 
     var query = (
         "\n" +
         "SELECT \n" +
         "   users.username AS user_code,  \n" +
-        "   stat.*  \n" +
+        "   stat.id  \n" +
         "FROM SC_Stats AS stat  \n" +
         "LEFT JOIN sc_users AS users ON users.id = stat.user_id  \n" +
         where
+        //"WHERE stat.start_at >= CAST(DATEADD(DAY, -34, GETDATE()) AS DATE) \n" +
+        //"AND stat.user_id = 'dbd305a1-59d1-40d4-bd56-eccaa0e0e563'"
     )
 
-    var sql_lib = OpenCodeLib('x-local://wt/web/custom_projects/libs/sql_lib.js')
-    var data = sql_lib.optXExec(query, 'ars')
+    var data = SQL_LIB.optXExec(query, 'ars')
 
     addLog(query)
     addLog("")
@@ -122,7 +123,6 @@ function getTrainings(setting) {
  * @param {object} user
  * @param {object} course
  * @return {object || null}
- */
 function getLearning(training, user, course) {
     var created = training.created_at
     var query = (
@@ -151,12 +151,12 @@ function getLearning(training, user, course) {
 
     return learning
 }
+ */
 
 /**
  * Получить сотрудника из БД
  * @param {string} code - таб№ сотрудника
  * @return {XmElem || null}
- */
 function getUserFormBd(code) {
     var query = (
         "SELECT id \n" +
@@ -178,12 +178,12 @@ function getUserFormBd(code) {
 
     return user
 }
+ */
 
 /**
  * Получить TopElem карточки пользователя
  * @param {string} code - таб№ сотрудника
  * @return {object}
- */
 function getUser(code) {
     // вернуть сотрудника из кэша, если он там есть
     if (cacheUsers.GetOptProperty(code) != undefined) {
@@ -210,12 +210,12 @@ function getUser(code) {
 
     return cache
 }
+ */
 
 /**
  * Получить курс из БД
  * @param {string} code - таб№ сотрудника
  * @return {XmElem || null}
- */
 function getCourseFormBd(learning) {
     // найти курс в БД
     var code = "SC_" + learning.id
@@ -234,12 +234,12 @@ function getCourseFormBd(learning) {
 
     return course
 }
+ */
 
 /**
  * Получить TopElem карточки курса из тренинга SC
  * @param {object} learning
  * @return {object || null}
- */
 function getCourse(learning) {
     // вернуть курс из кэша, если он там есть
     if (cacheCourses.GetOptProperty(learning.id) != undefined) {
@@ -267,6 +267,7 @@ function getCourse(learning) {
 
     return cache
 }
+ */
 
 
 /**
@@ -276,7 +277,6 @@ function getCourse(learning) {
  * @param {object} course
  * @param {object} training
  * @return {XmElem}
- */
 function fillTrainingFields(cardLearning, user, course, training) {
     cardLearning.TopElem.person_id = Int(user.id)
     tools.common_filling('collaborator', cardLearning.TopElem, user.id, user.card)
@@ -298,12 +298,12 @@ function fillTrainingFields(cardLearning, user, course, training) {
 
     return cardLearning
 }
+ */
 
 /**
  * Загрузить завершенный курс из тренинга (Skill Cap)
  * @param {object} training
  * @return {XmElem || null}
- */
 function loadLearning(training) {
     var user = getUser(training.user_code)
     if (!user.success) {
@@ -331,16 +331,69 @@ function loadLearning(training) {
 
     return cardLearning.TopElem
 }
+ */
+
+/**
+function getCards(training) {
+    var id = SqlLiteral(training.id)
+    var code SqlLiteral(training.user_code)
+
+    var query = (
+        "\n\n" +
+        "SELECT * \n" +
+        "FROM SC_tests AS t \n" +
+        "LEFT JOIN sc_users AS u ON u.id = t.user_id \n" +
+        "WHERE u.username = " + code + "\n" +
+        "AND t.id = " + id + "\n"
+    )
+
+    var data = SQL_LIB.optXExec(query, 'ars')
+
+    addLog(query)
+    addLog("")
+    return data
+}
+ */
+
+/**
+ * Проверяет, являются ли все значения в объекте `settings` пустыми строками.
+ * 
+ * Использует метод `GetOptProperty` для безопасного доступа к значениям по ключам.
+ * Возвращает `false`, если найдено хотя бы одно непустое значение.
+ * 
+ * @param {Object} settings
+ * @returns {bool}
+ */
+function isEmptySetting(settings) {
+    var field
+    for (field in settings) {
+        if (settings.GetOptProperty(field) != "") {
+            return false
+        }
+    }
+
+    return true
+}
 
 /**
  * Главная функция
  */
 function load(setting) {
-    var trainings = getTrainings(setting)
+    if (isEmptySetting(setting)) {
+        return
+    }
 
-    var training
+    var trainings = getWtTrainings(setting)
+
+    var training, response, code, trainingId
     for (training in trainings) {
-        loadLearning(training)
+        code = training.user_code
+        trainingId = training.id
+        response = SC.loadTrainingForUser(code, trainingId)
+
+        if (response.success) {
+            LEARNING.learningOfSkillCup(code, response.data)
+        }
     }
 }
 
@@ -351,8 +404,13 @@ function load(setting) {
 try {
     addLog("begin")
 
-    var cacheUsers = {}
-    var cacheCourses = {}
+    var SQL_LIB = OpenCodeLib('x-local://wt/web/custom_projects/libs/sql_lib.js')
+
+    var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
+    var SC = OpenCodeLib(sc_path).clear()
+
+    var learning_path = 'x-local://wt/web/custom_projects/libs/learning_lib.js'
+    var LEARNING = OpenCodeLib(learning_path).clear()
 
     var setting = {
         days: OptInt(Trim(Param.load_days), ""),
