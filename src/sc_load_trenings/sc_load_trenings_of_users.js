@@ -113,7 +113,6 @@ function getWtTrainings(setting) {
     var data = SQL_LIB.optXExec(query, 'ars')
 
     addLog(query)
-    addLog("")
     return data
 }
 
