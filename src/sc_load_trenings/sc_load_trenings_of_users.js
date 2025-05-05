@@ -165,26 +165,52 @@ function loadLmsExt(setting) {
 /**
  *
  */
+function getActivitiesFromAdaptation(id) {
+    var query = (
+        "\nSELECT \n " +
+        "   crs.id AS adaptation_id, \n" +
+        "   t.query('object_id').value('.', 'bigint') AS learning_id, \n" +
+        "   crs.person_id, \n" +
+        "   replace(cs.code, 'SC_', '') AS training_id  \n" +
+        "FROM career_reserves AS crs \n" +
+        "LEFT JOIN career_reserve AS cr ON cr.id=crs.id \n" +
+        "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t) \n" +
+        "LEFT JOIN courses AS cs ON " +
+                    "cs.id=t.query('object_id').value('.', 'bigint') \n" +
+        "WHERE crs.id in (" + id + ") \n" +
+        "AND crs.status in ('active', 'cancel') \n" +
+        "AND t.query('type').value('.', 'varchar(max)') = 'learning' \n" +
+        "AND cs.code LIKE 'SC_%'"
+    )
+
+    var learnings = XQuery("sql: " + query)
+    if (ArrayOptFirstElem(learnings) == undefined) {
+        return []
+    }
+
+    return learnings
+}
+
+/**
+ *
+ */
+function loadAdaptation(id) {
+    var activitiesFromAdaptation = getActivitiesFromAdaptation(id)
+
+    var activity
+    for (activity in activitiesFromAdaptation) {
+        addLog(activity.learning_id)
+    }
+}
+
+/**
+ *
+ */
 function loadAdaptations(adaptations) {
-    addLog("adaptations" + tools.object_to_text(setting.adaptations, 'json'))
+    //addLog("adaptations" + tools.object_to_text(setting.adaptations, 'json'))
     var id, query
     for (id in adaptations) {
-        query = (
-            "\nSELECT crs.person_id, \n" +
-            "    crs.id AS learning_id, \n" +
-            "    replace(cs.code, 'SC_', '') AS training_id \n" +
-            "FROM career_reserves AS crs \n" +
-            "LEFT JOIN career_reserve AS cr ON cr.id=crs.id \n" +
-            "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t) \n" +
-            "LEFT JOIN courses AS cs ON " +
-                        "cs.id=t.query('object_id').value('.', 'bigint') \n" +
-            "WHERE crs.id in (" + id + ") \n" +
-            "AND crs.status in ('active', 'cancel') \n" +
-            "AND t.query('type').value('.', 'varchar(max)') = 'learning' \n" +
-            "AND cs.code LIKE 'SC_%'"
-        )
-
-        addLog(query)
+        loadAdaptation(id)
     }
 }
 
