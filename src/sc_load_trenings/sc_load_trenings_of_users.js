@@ -138,7 +138,7 @@ function isEmptySetting(settings) {
  * Загрузка SkillCup курсов на основе данных из бд WTDB_lmsext001
  * @param {object} setting
  */
-function loadLmsExt(setting) {
+function loadFromLmsExt(setting) {
     if (isEmptySetting(setting)) {
         addLog(
             "Агент остановлен т.к. значения всех параметров пусты" +
@@ -163,9 +163,19 @@ function loadLmsExt(setting) {
 }
 
 /**
+ * Получает список обучающих активностей Skill Cup из адаптаций.
  *
+ * Выполняет SQL-запрос к таблицам `career_reserves`, `career_reserve` и `courses`
+ * с фильтрацией по задачам типа `learning` и кодам курсов, начинающимся с `SC_`.
+ *
+ * @param {string} id - идентификатор адаптации
+ * @returns {array} Массив объектов, содержащих данные об активностях:
+ *   - `adaptation_id`: ID адаптации,
+ *   - `learning_id`: ID курса,
+ *   - `person_id`: ID пользователя,
+ *   - `training_id`: код курса без префикса `SC_`.
  */
-function getActivitiesFromAdaptation(id) {
+function getScActivitiesFromAdaptation(id) {
     var query = (
         "\nSELECT \n " +
         "   crs.id AS adaptation_id, \n" +
@@ -192,25 +202,37 @@ function getActivitiesFromAdaptation(id) {
 }
 
 /**
- *
+ * Загрузка активностей SkillCup из адаптации
+ * @param {string} id - идентификатор адаптации
  */
-function loadAdaptation(id) {
-    var activitiesFromAdaptation = getActivitiesFromAdaptation(id)
+function loadFromAdaptation(id) {
+    // если не идентификатор - выход
+    if (OptInt(id) == undefined) {
+        return
+    }
+
+    var activitiesFromAdaptation = getScActivitiesFromAdaptation(id)
 
     var activity
     for (activity in activitiesFromAdaptation) {
-        addLog(activity.learning_id)
+        response = SC.loadTrainingForUser(activity.person_id, activity.training_id)
+        if (!response.success) {
+            addLog("Error: " + tools.object_to_text(response, 'json'))
+            continue
+        }
+
+        LEARNING.learningOfSkillCup(activity.person_id, response.data)
     }
 }
 
 /**
- *
+ * Загрузка активностей SkillCup из адаптаций
+ * @param {array} adaptations - идентификаторы адаптаций
  */
-function loadAdaptations(adaptations) {
-    //addLog("adaptations" + tools.object_to_text(setting.adaptations, 'json'))
+function loadFromAdaptations(adaptations) {
     var id, query
     for (id in adaptations) {
-        loadAdaptation(id)
+        loadFromAdaptation(id)
     }
 }
 
@@ -219,17 +241,17 @@ function loadAdaptations(adaptations) {
  */
 function load(setting) {
     if (ArrayOptFirstElem(setting.adaptations) != undefined) {
-        loadAdaptations(setting.adaptations)
+        loadFromAdaptations(setting.adaptations)
     }
 
     if (setting.isLmsExt) {
         addLog("lmsext")
-        //loadLmsExt(setting.lmsExt)
+        //loadFromLmsExt(setting.lmsExt)
     }
 }
 
 /**
- * Получить массив из идентификаторов адаптпций
+ * Получить массив из идентификаторов адаптаций
  * @param {string} json
  * @returns {array}
  */
