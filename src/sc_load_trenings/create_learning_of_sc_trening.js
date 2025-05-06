@@ -110,7 +110,6 @@ function getWtTrainings(setting) {
 
     var data = SQL_LIB.optXExec(query, 'ars')
 
-    addLog(query)
     return data
 }
 
@@ -156,6 +155,7 @@ function loadFromLmsExt(setting) {
         trainingId = training.id
         response = SC.loadTrainingForUser(code, trainingId)
 
+        addLog(tools.object_to_text(response, 'json'))
         if (response.success) {
             LEARNING.learningOfSkillCup(code, response.data)
         }
@@ -221,6 +221,7 @@ function loadFromAdaptation(id) {
             continue
         }
 
+        addLog(tools.object_to_text(response, 'json'))
         LEARNING.learningOfSkillCup(activity.person_id, response.data)
     }
 }
@@ -241,12 +242,13 @@ function loadFromAdaptations(adaptations) {
  */
 function load(setting) {
     if (ArrayOptFirstElem(setting.adaptations) != undefined) {
+        addLog("loadFromAdaptations")
         loadFromAdaptations(setting.adaptations)
     }
 
     if (setting.isLmsExt) {
-        addLog("lmsext")
-        //loadFromLmsExt(setting.lmsExt)
+        addLog("loadFromLmsExt")
+        loadFromLmsExt(setting.lmsExt)
     }
 }
 
