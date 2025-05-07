@@ -155,9 +155,11 @@ function loadFromLmsExt(setting) {
         trainingId = training.id
         response = SC.loadTrainingForUser(code, trainingId)
 
-        addLog(tools.object_to_text(response, 'json'))
         if (response.success) {
-            LEARNING.learningOfSkillCup(code, response.data)
+            ln = LEARNING.learningOfSkillCup(code, response.data)
+            addLog("learning "+ code + ": " + tools.object_to_text(ln, 'json'))
+        } else {
+            addLog("response: " + tools.object_to_text(response, 'json'))
         }
     }
 }
