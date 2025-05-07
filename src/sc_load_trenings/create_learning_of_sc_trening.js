@@ -157,7 +157,7 @@ function loadFromLmsExt(setting) {
 
         if (response.success) {
             ln = LEARNING.learningOfSkillCup(code, response.data)
-            addLog("learning "+ code + ": " + tools.object_to_text(ln, 'json'))
+            addLog("learning: " + tools.object_to_text(ln, 'json'))
         } else {
             addLog("response: " + tools.object_to_text(response, 'json'))
         }
