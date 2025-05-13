@@ -326,7 +326,7 @@ function getLearningLib() {
  * Получить библиотеку для работы с адаптациями
  * @returns {XmElem}
  */
-function getLearningLib() {
+function getAdaptationLib() {
     var adaptation_path = 'x-local://wt/web/custom_projects/razum_common/'
     return OpenCodeLib(adaptation_path + 'razum_common_lib.js').clear()
 }
