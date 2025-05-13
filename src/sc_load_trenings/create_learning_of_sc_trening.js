@@ -192,8 +192,9 @@ function getScActivitiesFromAdaptation(id) {
         "WHERE crs.id in (" + id + ") \n" +
         "AND crs.status in ('active', 'cancel') \n" +
         "AND t.query('type').value('.', 'varchar(max)') = 'learning' \n" +
-        "AND cs.code LIKE 'SC_%'"
+        "AND cs.code LIKE 'SC[_]%'"
     )
+    //addLog(query)
 
     var learnings = XQuery("sql: " + query)
     if (ArrayOptFirstElem(learnings) == undefined) {
