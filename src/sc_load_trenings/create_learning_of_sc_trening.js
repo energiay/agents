@@ -108,7 +108,7 @@ function getWtTrainings(setting) {
         where
     )
 
-    var data = SQL_LIB.optXExec(query, 'ars')
+    var data = SQL.optXExec(query, 'ars')
 
     return data
 }
@@ -215,7 +215,7 @@ function loadFromAdaptation(id) {
 
     var activitiesFromAdaptation = getScActivitiesFromAdaptation(id)
 
-    var activity
+    var activity, learning, person, training
     for (activity in activitiesFromAdaptation) {
         response = SC.loadTrainingForUser(activity.person_id, activity.training_id)
         if (!response.success) {
@@ -224,7 +224,13 @@ function loadFromAdaptation(id) {
         }
 
         addLog(tools.object_to_text(response, 'json'))
-        LEARNING.learningOfSkillCup(activity.person_id, response.data)
+
+        person = activity.person_id
+        training = response.data
+        learning = LEARNING.learningOfSkillCup(person, training, true)
+
+        addLog(tools.object_to_text(learning, 'json'))
+        ADAPTATION.execCard(learning.card.TopElem)
     }
 }
 
@@ -235,6 +241,7 @@ function loadFromAdaptation(id) {
 function loadFromAdaptations(adaptations) {
     var id, query
     for (id in adaptations) {
+        addLog(id)
         loadFromAdaptation(id)
     }
 }
@@ -244,6 +251,7 @@ function loadFromAdaptations(adaptations) {
  */
 function load(setting) {
     if (ArrayOptFirstElem(setting.adaptations) != undefined) {
+        addLog("---")
         addLog("loadFromAdaptations")
         loadFromAdaptations(setting.adaptations)
     }
@@ -293,19 +301,47 @@ function getParams(params) {
 }
 
 
+/**
+ * Получить библиотеку для работы с SkillCup
+ * @returns {XmElem}
+ */
+function getSkillCupLib() {
+    var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
+    //DropFormsCache(sc_path)
+    return OpenCodeLib(sc_path).clear()
+}
+
+/**
+ * Получить библиотеку.
+ * Создание завершенного курса из тренинга SkillCup
+ * @returns {XmElem}
+ */
+function getLearningLib() {
+    var learning_path = 'x-local://wt/web/custom_projects/libs/learning_lib.js'
+    //DropFormsCache(learning_path)
+    return OpenCodeLib(learning_path).clear()
+}
+
+/**
+ * Получить библиотеку для работы с адаптациями
+ * @returns {XmElem}
+ */
+function getLearningLib() {
+    var adaptation_path = 'x-local://wt/web/custom_projects/razum_common/'
+    return OpenCodeLib(adaptation_path + 'razum_common_lib.js').clear()
+}
+
+
 
 
 // entry point
 try {
     addLog("begin")
 
-    var SQL_LIB = OpenCodeLib('x-local://wt/web/custom_projects/libs/sql_lib.js')
-
-    var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
-    var SC = OpenCodeLib(sc_path).clear()
-
-    var learning_path = 'x-local://wt/web/custom_projects/libs/learning_lib.js'
-    var LEARNING = OpenCodeLib(learning_path).clear()
+    var SQL = OpenCodeLib('x-local://wt/web/custom_projects/libs/sql_lib.js')
+    var SC = getSkillCupLib()
+    var LEARNING = getLearningLib()
+    var ADAPTATION = getAdaptationLib()
 
     var settings = getParams(Param)
     load(settings)
