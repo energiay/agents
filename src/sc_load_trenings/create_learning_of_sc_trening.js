@@ -106,6 +106,9 @@ function getWtTrainings(setting) {
         "FROM SC_Stats AS stat  \n" +
         "LEFT JOIN sc_users AS users ON users.id = stat.user_id  \n" +
         where
+        // тестирование iTulinov
+        //"WHERE stat.id = 'bb2c797d-05ef-46cc-9963-18817f1d8422' \n" +
+        //"AND users.username = '413864'"
     )
 
     var data = SQL.optXExec(query, 'ars')
@@ -148,7 +151,7 @@ function loadLearning(person, training) {
     }
 
     addLog("response: " + tools.object_to_text(response, 'json'))
-    var learning = LEARNING.learningOfSkillCup(code, response.data, true)
+    var learning = LEARNING.learningOfSkillCup(person, response.data)
     addLog("learning: " + tools.object_to_text(learning, 'json'))
     ADAPTATION.execCard(learning.card.TopElem)
     addLog("Тренинг загружен " + training + " " + person)
