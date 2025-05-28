@@ -134,6 +134,28 @@ function isEmptySetting(settings) {
 }
 
 /**
+ * Загрузка данных по одному тренингу конкретного пользователя
+ * @param {string} username - Табельный номер сотрудника
+ * @param {string} training - Код курса (например, "SC_...")
+ */
+function loadLearning(person, training) {
+    // загрузить данные из Skill Cup
+    var response = SC.loadTrainingForUser(person, training)
+    if (!response.success) {
+        var msg = "Не удалось загрузить данные: "
+        addLog(msg + tools.object_to_text(response, 'json'))
+        return
+    }
+
+    addLog("response: " + tools.object_to_text(response, 'json'))
+    var learning = LEARNING.learningOfSkillCup(code, response.data, true)
+    addLog("learning: " + tools.object_to_text(learning, 'json'))
+    ADAPTATION.execCard(learning.card.TopElem)
+    addLog("Тренинг загружен " + training + " " + person)
+
+}
+
+/**
  * Загрузка SkillCup курсов на основе данных из бд WTDB_lmsext001
  * @param {object} setting
  */
@@ -149,18 +171,9 @@ function loadFromLmsExt(setting) {
     // получение SkillCup тренингов
     var trainings = getWtTrainings(setting)
 
-    var training, response, code, trainingId
+    var training
     for (training in trainings) {
-        code = training.user_code
-        trainingId = training.id
-        response = SC.loadTrainingForUser(code, trainingId)
-
-        if (response.success) {
-            ln = LEARNING.learningOfSkillCup(code, response.data)
-            addLog("learning: " + tools.object_to_text(ln, 'json'))
-        } else {
-            addLog("response: " + tools.object_to_text(response, 'json'))
-        }
+        loadLearning(training.user_code, training.id)
     }
 }
 
@@ -218,20 +231,7 @@ function loadFromAdaptation(id) {
 
     var activity, learning, person, training
     for (activity in activitiesFromAdaptation) {
-        response = SC.loadTrainingForUser(activity.person_id, activity.training_id)
-        if (!response.success) {
-            addLog("Error: " + tools.object_to_text(response, 'json'))
-            continue
-        }
-
-        addLog(tools.object_to_text(response, 'json'))
-
-        person = activity.person_id
-        training = response.data
-        learning = LEARNING.learningOfSkillCup(person, training, true)
-
-        addLog(tools.object_to_text(learning, 'json'))
-        ADAPTATION.execCard(learning.card.TopElem)
+        loadLearning(activity.person_id, activity.training_id)
     }
 }
 
