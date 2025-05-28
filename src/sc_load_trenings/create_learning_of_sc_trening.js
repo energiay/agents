@@ -140,8 +140,9 @@ function isEmptySetting(settings) {
  * Загрузка данных по одному тренингу конкретного пользователя
  * @param {string} username - Табельный номер сотрудника
  * @param {string} training - Код курса (например, "SC_...")
+ * @param {boolean} force - true, обновить тренинг даже если он не обновлялся
  */
-function loadLearning(person, training) {
+function loadLearning(person, training, force) {
     // загрузить данные из Skill Cup
     var response = SC.loadTrainingForUser(person, training)
     if (!response.success) {
@@ -151,8 +152,17 @@ function loadLearning(person, training) {
     }
 
     addLog("response: " + tools.object_to_text(response, 'json'))
-    var learning = LEARNING.learningOfSkillCup(person, response.data)
+
+    // Создать/обновить карточку курса в WT
+    var learning = LEARNING.learningOfSkillCup(person, response.data, force)
+    if (!learning.success) {
+        addLog(msg + tools.object_to_text(response, 'json'))
+        return
+    }
+
     addLog("learning: " + tools.object_to_text(learning, 'json'))
+
+    // Проставить карточку курса в активность адаптации
     ADAPTATION.execCard(learning.card.TopElem)
     addLog("Тренинг загружен " + training + " " + person)
 
@@ -176,7 +186,7 @@ function loadFromLmsExt(setting) {
 
     var training
     for (training in trainings) {
-        loadLearning(training.user_code, training.id)
+        loadLearning(training.user_code, training.id, false)
     }
 }
 
@@ -234,7 +244,7 @@ function loadFromAdaptation(id) {
 
     var activity, learning, person, training
     for (activity in activitiesFromAdaptation) {
-        loadLearning(activity.person_id, activity.training_id)
+        loadLearning(activity.person_id, activity.training_id, true)
     }
 }
 
