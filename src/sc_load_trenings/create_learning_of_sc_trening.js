@@ -156,7 +156,7 @@ function loadLearning(person, training, force) {
     // Создать/обновить карточку курса в WT
     var learning = LEARNING.learningOfSkillCup(person, response.data, force)
     if (!learning.success) {
-        addLog(msg + tools.object_to_text(response, 'json'))
+        addLog(tools.object_to_text(learning, 'json'))
         return
     }
 
