@@ -186,6 +186,9 @@ function loadFromLmsExt(setting) {
 
     var training
     for (training in trainings) {
+        addLog("")
+        addLog("Сотрудник: " + training.user_code)
+        addLog("Training: " + training.id)
         loadLearning(training.user_code, training.id, false)
     }
 }
@@ -242,8 +245,11 @@ function loadFromAdaptation(id) {
 
     var activitiesFromAdaptation = getScActivitiesFromAdaptation(id)
 
-    var activity, learning, person, training
+    var activity
     for (activity in activitiesFromAdaptation) {
+        addLog("")
+        addLog("Адаптация: " + id)
+        addLog("Сотрудник: " + activity.person_id + " " + activity.training_id)
         loadLearning(activity.person_id, activity.training_id, true)
     }
 }
@@ -253,9 +259,8 @@ function loadFromAdaptation(id) {
  * @param {array} adaptations - идентификаторы адаптаций
  */
 function loadFromAdaptations(adaptations) {
-    var id, query
+    var id
     for (id in adaptations) {
-        addLog(id)
         loadFromAdaptation(id)
     }
 }
@@ -265,13 +270,10 @@ function loadFromAdaptations(adaptations) {
  */
 function load(setting) {
     if (ArrayOptFirstElem(setting.adaptations) != undefined) {
-        addLog("---")
-        addLog("loadFromAdaptations")
         loadFromAdaptations(setting.adaptations)
     }
 
     if (setting.isLmsExt) {
-        addLog("loadFromLmsExt")
         loadFromLmsExt(setting.lmsExt)
     }
 }
@@ -350,8 +352,6 @@ function getAdaptationLib() {
 
 // entry point
 try {
-    addLog("begin")
-
     var SQL = OpenCodeLib('x-local://wt/web/custom_projects/libs/sql_lib.js')
     var SC = getSkillCupLib()
     var LEARNING = getLearningLib()
@@ -359,8 +359,6 @@ try {
 
     var settings = getParams(Param)
     load(settings)
-
-    addLog("end")
 } catch (err) {
     addLog("ERROR: " + err)
 }
