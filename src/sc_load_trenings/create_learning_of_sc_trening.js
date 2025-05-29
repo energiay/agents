@@ -146,14 +146,14 @@ function loadLearning(person, training, force) {
     // загрузить данные из Skill Cup
     var response = SC.loadTrainingForUser(person, training)
     if (!response.success) {
-        addLog("Не удалось загрузить данные: " + response.error)
+        addLog("WARNING: " + response.error)
         return
     }
 
     // Создать/обновить карточку курса в WT
     var learning = LEARNING.learningOfSkillCup(person, response.data, force)
     if (!learning.success) {
-        addLog("Курс не создан / не обновлен: " + learning.error)
+        addLog("WARNING: " + learning.error)
         return
     }
 
@@ -183,7 +183,7 @@ function loadFromLmsExt(setting) {
         addLog("")
         addLog("Сотрудник: " + training.user_code)
         addLog("Training: " + training.id)
-        loadLearning(training.user_code, training.id, false)
+        loadLearning(training.user_code, training.id, true)
     }
 }
 
