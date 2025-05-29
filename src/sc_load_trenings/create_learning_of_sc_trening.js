@@ -146,26 +146,20 @@ function loadLearning(person, training, force) {
     // загрузить данные из Skill Cup
     var response = SC.loadTrainingForUser(person, training)
     if (!response.success) {
-        var msg = "Не удалось загрузить данные: "
-        addLog(msg + tools.object_to_text(response, 'json'))
+        addLog("Не удалось загрузить данные: " + response.error)
         return
     }
-
-    addLog("response: " + tools.object_to_text(response, 'json'))
 
     // Создать/обновить карточку курса в WT
     var learning = LEARNING.learningOfSkillCup(person, response.data, force)
     if (!learning.success) {
-        addLog(tools.object_to_text(learning, 'json'))
+        addLog("Курс не создан / не обновлен: " + learning.error)
         return
     }
 
-    addLog("learning: " + tools.object_to_text(learning, 'json'))
-
     // Проставить карточку курса в активность адаптации
     ADAPTATION.execCard(learning.card.TopElem)
-    addLog("Тренинг загружен " + training + " " + person)
-
+    addLog("Тренинг загружен.")
 }
 
 /**
