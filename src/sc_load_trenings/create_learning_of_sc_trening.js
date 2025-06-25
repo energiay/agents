@@ -352,6 +352,7 @@ try {
     var ADAPTATION = getAdaptationLib()
 
     var settings = getParams(Param)
+    addLog(tools.object_to_text(settings, 'json'))
     load(settings)
 } catch (err) {
     addLog("ERROR: " + err)
