@@ -317,8 +317,7 @@ function getParams(params) {
  */
 function getSkillCupLib() {
     var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
-    //DropFormsCache(sc_path)
-    return OpenCodeLib(sc_path).clear()
+    return OpenCodeLib(sc_path)
 }
 
 /**
@@ -328,8 +327,7 @@ function getSkillCupLib() {
  */
 function getLearningLib() {
     var learning_path = 'x-local://wt/web/custom_projects/libs/learning_lib.js'
-    //DropFormsCache(learning_path)
-    return OpenCodeLib(learning_path).clear()
+    return OpenCodeLib(learning_path)
 }
 
 /**
@@ -338,7 +336,7 @@ function getLearningLib() {
  */
 function getAdaptationLib() {
     var adaptation_path = 'x-local://wt/web/custom_projects/razum_common/'
-    return OpenCodeLib(adaptation_path + 'razum_common_lib.js').clear()
+    return OpenCodeLib(adaptation_path + 'razum_common_lib.js')
 }
 
 
@@ -352,7 +350,7 @@ try {
     var ADAPTATION = getAdaptationLib()
 
     var settings = getParams(Param)
-    addLog(tools.object_to_text(settings, 'json'))
+    //addLog(tools.object_to_text(settings, 'json'))
     load(settings)
 } catch (err) {
     addLog("ERROR: " + err)
