@@ -206,7 +206,7 @@ function getScActivitiesFromAdaptation(id) {
         "   crs.id AS adaptation_id, \n" +
         "   t.query('object_id').value('.', 'bigint') AS learning_id, \n" +
         "   crs.person_id, \n" +
-        "   replace(cs.code, 'SC_', '') AS training_id  \n" +
+        "   cs.code AS training_id  \n" +
         "FROM career_reserves AS crs \n" +
         "LEFT JOIN career_reserve AS cr ON cr.id=crs.id \n" +
         "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t) \n" +
@@ -317,7 +317,7 @@ function getParams(params) {
  */
 function getSkillCupLib() {
     var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
-    return OpenCodeLib(sc_path)
+    return OpenCodeLib(sc_path).clear()
 }
 
 /**
@@ -327,7 +327,7 @@ function getSkillCupLib() {
  */
 function getLearningLib() {
     var learning_path = 'x-local://wt/web/custom_projects/libs/learning_lib.js'
-    return OpenCodeLib(learning_path)
+    return OpenCodeLib(learning_path).clear()
 }
 
 /**
@@ -336,7 +336,7 @@ function getLearningLib() {
  */
 function getAdaptationLib() {
     var adaptation_path = 'x-local://wt/web/custom_projects/razum_common/'
-    return OpenCodeLib(adaptation_path + 'razum_common_lib.js')
+    return OpenCodeLib(adaptation_path + 'razum_common_lib.js').clear()
 }
 
 
