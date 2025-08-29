@@ -194,11 +194,7 @@ function loadFromLmsExt(setting) {
  * с фильтрацией по задачам типа `learning` и кодам курсов, начинающимся с `SC_`.
  *
  * @param {string} id - идентификатор адаптации
- * @returns {array} Массив объектов, содержащих данные об активностях:
- *   - `adaptation_id`: ID адаптации,
- *   - `learning_id`: ID курса,
- *   - `person_id`: ID пользователя,
- *   - `training_id`: код курса без префикса `SC_`.
+ * @returns {array} Массив объектов, содержащих данные об активностях
  */
 function getScActivitiesFromAdaptation(id) {
     var query = (
