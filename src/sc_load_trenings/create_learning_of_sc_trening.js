@@ -202,22 +202,25 @@ function loadFromLmsExt(setting) {
  */
 function getScActivitiesFromAdaptation(id) {
     var query = (
-        "\nSELECT \n " +
-        "   crs.id AS adaptation_id, \n" +
-        "   t.query('object_id').value('.', 'bigint') AS learning_id, \n" +
-        "   crs.person_id, \n" +
-        "   cs.code AS training_id  \n" +
-        "FROM career_reserves AS crs \n" +
-        "LEFT JOIN career_reserve AS cr ON cr.id=crs.id \n" +
-        "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t) \n" +
+        "SELECT \n" +
+        "    CASE \n" +
+        "       WHEN scu.id IS NOT NULL THEN scu.id \n" +
+        "       ELSE CAST(person.id AS varchar(max)) \n" +
+        "    END AS person_id, \n" +
+        "       cs.code AS training_id  \n" +
+        "FROM career_reserves AS crs  \n" +
+        "LEFT JOIN career_reserve AS cr ON cr.id=crs.id  \n" +
+        "LEFT JOIN collaborators AS person ON person.id=crs.person_id \n" +
+        "LEFT JOIN SC_Users AS scu ON scu.username = person.code \n" +
+        "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t)  \n" +
         "LEFT JOIN courses AS cs ON " +
                     "cs.id=t.query('object_id').value('.', 'bigint') \n" +
-        "WHERE crs.id in (" + id + ") \n" +
-        "AND crs.status in ('active', 'cancel') \n" +
-        "AND t.query('type').value('.', 'varchar(max)') = 'learning' \n" +
+        "WHERE crs.id in (" + SqlLiteral(id) + ") \n" +
+        "AND crs.status in ('active', 'cancel')  \n" +
+        "AND t.query('type').value('.', 'varchar(max)') = 'learning'  \n" +
         "AND cs.code LIKE 'SC[_]%'"
     )
-    //addLog(query)
+    addLog(query)
 
     var learnings = XQuery("sql: " + query)
     if (ArrayOptFirstElem(learnings) == undefined) {
