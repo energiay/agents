@@ -147,19 +147,21 @@ function loadLearning(person, training, force) {
     var response = SC.loadTrainingForUser(person, training)
     if (!response.success) {
         addLog("WARNING: " + response.error)
-        return
+        return response
     }
 
     // Создать/обновить карточку курса в WT
     var learning = LEARNING.learningOfSkillCup(person, response.data, force)
     if (!learning.success) {
         addLog("WARNING: " + learning.error)
-        return
+        return response
     }
 
     // Проставить карточку курса в активность адаптации
     ADAPTATION.execCard(learning.card.TopElem)
     addLog("Тренинг загружен.")
+
+    return {success: true}
 }
 
 /**
@@ -211,12 +213,12 @@ function getScActivitiesFromAdaptation(id) {
         "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t)  \n" +
         "LEFT JOIN courses AS cs ON " +
                     "cs.id=t.query('object_id').value('.', 'bigint') \n" +
-        "WHERE crs.id in (" + SqlLiteral(id) + ") \n" +
+        "WHERE crs.id in (" + SqlLiteral(id + "") + ") \n" +
         "AND crs.status in ('active', 'cancel')  \n" +
         "AND t.query('type').value('.', 'varchar(max)') = 'learning'  \n" +
         "AND cs.code LIKE 'SC[_]%'"
     )
-    addLog(query)
+    //addLog(query)
 
     var learnings = XQuery("sql: " + query)
     if (ArrayOptFirstElem(learnings) == undefined) {
@@ -239,7 +241,7 @@ function isBreak(res) {
         return false
     }
 
-    if (StrContains(res.error, "Пользователь  не найден", true)) {
+    if (StrContains(res.error, "Пользователь не найден", true)) {
         return true
     }
 
