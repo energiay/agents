@@ -228,6 +228,26 @@ function getScActivitiesFromAdaptation(id) {
 }
 
 /**
+ * Проверяет результат выполнения операции и определяет, является ли
+ * ошибка критической (сигналом прерывания). Ошибка считается
+ * прерывающей, если содержит текст "Пользователь  не найден".
+ *
+ * @param {{success: boolean, error: string}} res
+ * @returns {boolean} true, если необходимо прервать выполнение
+ */
+function isBreak(res) {
+    if (res.success) {
+        return false
+    }
+
+    if (StrContains(res.error, "Пользователь  не найден", true)) {
+        return true
+    }
+
+    return false
+}
+
+/**
  * Загрузка активностей SkillCup из адаптации
  * @param {string} id - идентификатор адаптации
  */
@@ -239,12 +259,15 @@ function loadFromAdaptation(id) {
 
     var activitiesFromAdaptation = getScActivitiesFromAdaptation(id)
 
-    var activity
+    var activity, result
     for (activity in activitiesFromAdaptation) {
         addLog("")
         addLog("Адаптация: " + id)
         addLog("Сотрудник: " + activity.person_id + " " + activity.training_id)
-        loadLearning(activity.person_id, activity.training_id, true)
+        result = loadLearning(activity.person_id, activity.training_id, true)
+        if (isBreak(result)) {
+            break
+        }
     }
 }
 
