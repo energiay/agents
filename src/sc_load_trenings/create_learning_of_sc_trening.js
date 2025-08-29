@@ -111,7 +111,7 @@ function getWtTrainings(setting) {
         //"AND users.username = '413864'"
     )
 
-    var data = SQL.optXExec(query, 'ars')
+    var data = XQuery("sql: " + query)
 
     return data
 }
@@ -366,7 +366,6 @@ function getAdaptationLib() {
 
 // entry point
 try {
-    var SQL = OpenCodeLib('x-local://wt/web/custom_projects/libs/sql_lib.js')
     var SC = getSkillCupLib()
     var LEARNING = getLearningLib()
     var ADAPTATION = getAdaptationLib()
