@@ -101,15 +101,16 @@ function getWtTrainings(setting) {
     var query = (
         "\n" +
         "SELECT \n" +
-        "   users.username AS user_code,  \n" +
-        "   stat.id  \n" +
-        "FROM SC_Stats AS stat  \n" +
-        "LEFT JOIN sc_users AS users ON users.id = stat.user_id  \n" +
+        "   users.username AS user_code, \n" +
+        "   'SC_' + users.channel + '_' +stat.id AS id \n" +
+        "FROM SC_Stats AS stat \n" +
+        "LEFT JOIN sc_users AS users ON users.id = stat.user_id \n" +
         where
         // тестирование iTulinov
         //"WHERE stat.id = 'bb2c797d-05ef-46cc-9963-18817f1d8422' \n" +
         //"AND users.username = '413864'"
     )
+    //addLog(query)
 
     var data = XQuery("sql: " + query)
 
@@ -179,7 +180,6 @@ function loadFromLmsExt(setting) {
 
     // получение SkillCup тренингов
     var trainings = getWtTrainings(setting)
-
     var training
     for (training in trainings) {
         addLog("")
@@ -205,7 +205,7 @@ function getScActivitiesFromAdaptation(id) {
         "       WHEN scu.id IS NOT NULL THEN scu.id \n" +
         "       ELSE CAST(person.id AS varchar(max)) \n" +
         "    END AS person_id, \n" +
-        "       cs.code AS training_id  \n" +
+        "    cs.code AS training_id \n" +
         "FROM career_reserves AS crs  \n" +
         "LEFT JOIN career_reserve AS cr ON cr.id=crs.id  \n" +
         "LEFT JOIN collaborators AS person ON person.id=crs.person_id \n" +
@@ -216,7 +216,8 @@ function getScActivitiesFromAdaptation(id) {
         "WHERE crs.id in (" + SqlLiteral(id + "") + ") \n" +
         "AND crs.status in ('active', 'cancel')  \n" +
         "AND t.query('type').value('.', 'varchar(max)') = 'learning'  \n" +
-        "AND cs.code LIKE 'SC[_]%'"
+        "AND cs.code LIKE 'SC[_]%'" +
+        "AND t.query('status').value('.', 'varchar(max)') != 'passed'"
     )
     //addLog(query)
 
