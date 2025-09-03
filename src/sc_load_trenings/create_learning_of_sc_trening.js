@@ -260,7 +260,7 @@ function loadFromAdaptation(id) {
     }
 
     var activitiesFromAdaptation = getScActivitiesFromAdaptation(id)
-    var settings = {force: true, channel: "monobrend"}
+    var settings = {force: true, channel: "monobrand"}
 
     var activity, result
     for (activity in activitiesFromAdaptation) {
