@@ -141,9 +141,10 @@ function isEmptySetting(settings) {
  * Загрузка данных по одному тренингу конкретного пользователя
  * @param {string} username - Табельный номер сотрудника
  * @param {string} training - Код курса (например, "SC_...")
- * @param {boolean} force - true, обновить тренинг даже если он не обновлялся
  */
-function loadLearning(person, training, force) {
+function loadLearning(person, training) {
+    var settings = {force: true, channel: "monobrand"}
+
     // загрузить данные из Skill Cup
     var response = SC.loadTrainingForUser(person, training)
     if (!response.success) {
@@ -152,7 +153,7 @@ function loadLearning(person, training, force) {
     }
 
     // Создать/обновить карточку курса в WT
-    var learning = LEARNING.learningOfSkillCup(person, response.data, force)
+    var learning = LEARNING.learningOfSkillCup(person, response.data, settings)
     if (!learning.success) {
         addLog("WARNING: " + learning.error)
         return response
@@ -160,7 +161,7 @@ function loadLearning(person, training, force) {
 
     // Проставить карточку курса в активность адаптации
     ADAPTATION.execCard(learning.card.TopElem)
-    addLog("Тренинг загружен.")
+    addLog("SUCCESS: Тренинг загружен.")
 
     return {success: true}
 }
@@ -185,7 +186,7 @@ function loadFromLmsExt(setting) {
         addLog("")
         addLog("Сотрудник: " + training.user_code)
         addLog("Training: " + training.id)
-        loadLearning(training.user_code, training.id, true)
+        loadLearning(training.user_code, training.id)
     }
 }
 
@@ -260,14 +261,13 @@ function loadFromAdaptation(id) {
     }
 
     var activitiesFromAdaptation = getScActivitiesFromAdaptation(id)
-    var settings = {force: true, channel: "monobrand"}
 
     var activity, result
     for (activity in activitiesFromAdaptation) {
         addLog("")
         addLog("Адаптация: " + id)
         addLog("Сотрудник: " + activity.person_id + " " + activity.training_id)
-        result = loadLearning(activity.person_id, activity.training_id, settings)
+        result = loadLearning(activity.person_id, activity.training_id)
         if (isBreak(result)) {
             break
         }
