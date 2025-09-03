@@ -260,13 +260,14 @@ function loadFromAdaptation(id) {
     }
 
     var activitiesFromAdaptation = getScActivitiesFromAdaptation(id)
+    var settings = {force: true, channel: "monobrend"}
 
     var activity, result
     for (activity in activitiesFromAdaptation) {
         addLog("")
         addLog("Адаптация: " + id)
         addLog("Сотрудник: " + activity.person_id + " " + activity.training_id)
-        result = loadLearning(activity.person_id, activity.training_id, true)
+        result = loadLearning(activity.person_id, activity.training_id, settings)
         if (isBreak(result)) {
             break
         }
