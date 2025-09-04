@@ -289,13 +289,13 @@ function loadFromAdaptations(adaptations) {
  * Главная функция
  */
 function load(setting) {
-    if (ArrayOptFirstElem(setting.adaptations) != undefined) {
-        loadFromAdaptations(setting.adaptations)
-    }
+    //if (ArrayOptFirstElem(setting.adaptations) != undefined) {
+    //    loadFromAdaptations(setting.adaptations)
+    //}
 
-    if (setting.isLmsExt) {
-        loadFromLmsExt(setting.lmsExt)
-    }
+    //if (setting.isLmsExt) {
+    //    loadFromLmsExt(setting.lmsExt)
+    //}
 }
 
 /**
@@ -374,9 +374,9 @@ try {
     var LEARNING = getLearningLib()
     var ADAPTATION = getAdaptationLib()
 
-    var settings = getParams(Param)
+    //var settings = getParams(Param)
     //addLog(tools.object_to_text(settings, 'json'))
-    load(settings)
+    loadScToAdaptations(settings)
 } catch (err) {
     addLog("ERROR: " + err)
 }
