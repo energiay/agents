@@ -6,7 +6,7 @@
 function addLog(value, name) {
     var sLogName = name
     if (sLogName == undefined) {
-        sLogName = "sc_load_learnings_of_users"
+        sLogName = "load_sc_to_adaptations"
     }
 
     EnableLog(sLogName)
@@ -365,6 +365,65 @@ function getAdaptationLib() {
     return OpenCodeLib(adaptation_path + 'razum_common_lib.js').clear()
 }
 
+/**
+ *
+ */
+function getScActivitiesFromAdaptations() {
+    var query = (
+        "SELECT \n" +
+        "    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS nums," +
+        "    crs.id AS adaptation_id, \n" +
+        "    crs.person_id, \n" +
+        "    crs.person_fullname, \n" +
+        "    t.query('name').value('.', 'varchar(max)') AS task_name, \n" +
+        "    t.query('id').value('.', 'varchar(max)') AS task_id, \n" +
+        "    cs.code, \n" +
+        "    scu.id AS user_id \n" +
+        "FROM career_reserves AS crs   \n" +
+        "LEFT JOIN career_reserve AS cr ON cr.id=crs.id \n" +
+        "LEFT JOIN collaborators AS person ON person.id=crs.person_id \n" +
+        "LEFT JOIN SC_Users AS scu ON scu.username = person.code  \n" +
+        "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t) \n" +
+        "LEFT JOIN courses AS cs ON cs.id=t.query('object_id').value('.', 'bigint') \n" +
+        "WHERE crs.status in ('active') \n" +
+        "AND t.query('type').value('.', 'varchar(max)') = 'learning' \n" +
+        "AND t.query('status').value('.', 'varchar(max)') <> 'passed' \n" +
+        "AND cs.code LIKE 'SC[_]%' \n" +
+        "AND cs.code IS NOT NULL \n" +
+        "AND scu.id IS NOT NULL \n" +
+        "ORDER BY nums DESC"
+    )
+    addLog(query)
+
+    var activities = XQuery("sql: " + query)
+    if (ArrayOptFirstElem(activities) == undefined) {
+        return []
+    }
+
+    return activities
+}
+
+/**
+ * Загрузить активности skill cup
+ */
+function loadScToAdaptations() {
+    var activities = getScActivitiesFromAdaptations()
+    var length = ArrayOptFirstElem(activities).nums
+    var i = 0
+    var activity
+    for (activity in activities) {
+        i++
+
+        addLog(i + " из " + length)
+        addLog("Адаптация: " + activity.adaptation_id)
+        addLog(activity.task_id + " " + activity.task_name)
+        addLog(activity.person_fullname + " " + activity.person_id)
+        addLog("SkillCup user: " + activity.user_id + " code: " + activity.code)
+        loadLearning(activity.user_id, activity.code)
+        addLog("")
+    }
+}
+
 
 
 
@@ -374,9 +433,7 @@ try {
     var LEARNING = getLearningLib()
     var ADAPTATION = getAdaptationLib()
 
-    //var settings = getParams(Param)
-    //addLog(tools.object_to_text(settings, 'json'))
-    loadScToAdaptations(settings)
+    loadScToAdaptations()
 } catch (err) {
     addLog("ERROR: " + err)
 }
