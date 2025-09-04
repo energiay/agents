@@ -371,7 +371,7 @@ function getAdaptationLib() {
 function getScActivitiesFromAdaptations() {
     var query = (
         "SELECT \n" +
-        "    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS nums," +
+        "    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS nums, \n" +
         "    crs.id AS adaptation_id, \n" +
         "    crs.person_id, \n" +
         "    crs.person_fullname, \n" +
@@ -393,7 +393,7 @@ function getScActivitiesFromAdaptations() {
         "AND scu.id IS NOT NULL \n" +
         "ORDER BY nums DESC"
     )
-    addLog(query)
+    //addLog(query)
 
     var activities = XQuery("sql: " + query)
     if (ArrayOptFirstElem(activities) == undefined) {
