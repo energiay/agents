@@ -129,7 +129,7 @@ function getWtTrainings(setting) {
 function isEmptySetting(settings) {
     var field
     for (field in settings) {
-        if (settings.GetOptProperty(field) != "") {
+        if (settings.GetOptProperty(field, "") != "") {
             return false
         }
     }
@@ -140,20 +140,20 @@ function isEmptySetting(settings) {
 /**
  * Загрузка данных по одному тренингу конкретного пользователя
  * @param {string} username - Табельный номер сотрудника
- * @param {string} training - Код курса (например, "SC_...")
+ * @param {string} code - Код курса (пример, SC_monobrand_<uuid>)
  */
-function loadLearning(person, training) {
-    var settings = {force: true, channel: "monobrand"}
-
+function loadLearning(person, code) {
     // загрузить данные из Skill Cup
-    var response = SC.loadTrainingForUser(person, training)
+    var response = SC.loadTrainingForUser(person, code)
     if (!response.success) {
         addLog("WARNING: " + response.error)
         return response
     }
 
     // Создать/обновить карточку курса в WT
-    var learning = LEARNING.learningOfSkillCup(person, response.data, settings)
+    var settings = {force: true, channel: response.data.channel}
+    var training = response.data.training
+    var learning = LEARNING.learningOfSkillCup(person, training, settings)
     if (!learning.success) {
         addLog("WARNING: " + learning.error)
         return response
