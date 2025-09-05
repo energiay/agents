@@ -210,10 +210,11 @@ function getScActivitiesFromAdaptation(id) {
         "FROM career_reserves AS crs  \n" +
         "LEFT JOIN career_reserve AS cr ON cr.id=crs.id  \n" +
         "LEFT JOIN collaborators AS person ON person.id=crs.person_id \n" +
-        "LEFT JOIN SC_Users AS scu ON scu.username = person.code \n" +
         "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t)  \n" +
         "LEFT JOIN courses AS cs ON " +
-                    "cs.id=t.query('object_id').value('.', 'bigint') \n" +
+                "cs.id=t.query('object_id').value('.', 'bigint') \n" +
+        "LEFT JOIN SC_Users AS scu ON scu.username = person.code " +
+                "AND scu.channel = PARSENAME(REPLACE(cs.code, '_', '.'), 2) \n" +
         "WHERE crs.id in (" + SqlLiteral(id + "") + ") \n" +
         "AND crs.status in ('active', 'cancel')  \n" +
         "AND t.query('type').value('.', 'varchar(max)') = 'learning'  \n" +
@@ -293,9 +294,9 @@ function load(setting) {
         loadFromAdaptations(setting.adaptations)
     }
 
-    if (setting.isLmsExt) {
-        loadFromLmsExt(setting.lmsExt)
-    }
+    //if (setting.isLmsExt) {
+    //    loadFromLmsExt(setting.lmsExt)
+    //}
 }
 
 /**
