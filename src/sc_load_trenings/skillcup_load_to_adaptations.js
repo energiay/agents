@@ -59,9 +59,10 @@ function getScActivitiesFromAdaptations() {
         "FROM career_reserves AS crs   \n" +
         "LEFT JOIN career_reserve AS cr ON cr.id=crs.id \n" +
         "LEFT JOIN collaborators AS person ON person.id=crs.person_id \n" +
-        "LEFT JOIN SC_Users AS scu ON scu.username = person.code  \n" +
         "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t) \n" +
         "LEFT JOIN courses AS cs ON cs.id=t.query('object_id').value('.', 'bigint') \n" +
+        "LEFT JOIN SC_Users AS scu ON scu.username = person.code " +
+                "AND scu.channel = PARSENAME(REPLACE(cs.code, '_', '.'), 2) \n" +
         "WHERE crs.status in ('active') \n" +
         "AND t.query('type').value('.', 'varchar(max)') = 'learning' \n" +
         "AND t.query('status').value('.', 'varchar(max)') <> 'passed' \n" +
@@ -70,7 +71,6 @@ function getScActivitiesFromAdaptations() {
         "AND scu.id IS NOT NULL \n" +
         "ORDER BY nums DESC"
     )
-    //addLog(query)
 
     var activities = XQuery("sql: " + query)
     if (ArrayOptFirstElem(activities) == undefined) {
