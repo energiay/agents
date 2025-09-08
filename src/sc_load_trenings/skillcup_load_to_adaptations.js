@@ -69,6 +69,7 @@ function getScActivitiesFromAdaptations() {
         "AND cs.code IS NOT NULL \n" +
         "ORDER BY nums DESC"
     )
+    addLog(query)
 
     var activities = XQuery("sql: " + query)
     if (ArrayOptFirstElem(activities) == undefined) {
