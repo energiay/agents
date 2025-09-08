@@ -113,7 +113,7 @@ function loadScToAdaptations() {
         return
     }
 
-    var length = ArrayOptFirstElem(activities).nums
+    var length = String(ArrayOptFirstElem(activities).nums)
     var i = 0
     var activity, res
     for (activity in activities) {
