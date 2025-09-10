@@ -84,7 +84,6 @@ function getScActivitiesFromAdaptations() {
  * Загрузка данных по одному тренингу конкретного пользователя
  * @param {string} username - Идентификатор сотрудника
  * @param {string} code - Код курса (пример, SC_monobrand_<uuid>)
- */
 function loadLearning(person, code) {
     // загрузить данные из Skill Cup
     var response = SC.loadTrainingForUser(person, code)
@@ -105,6 +104,7 @@ function loadLearning(person, code) {
 
     return {success: true}
 }
+ */
 
 /**
  * Загрузить активности skill cup
@@ -115,20 +115,21 @@ function loadScToAdaptations() {
         return
     }
 
+    var libs = {sc: SC, learning: LEARNING}
     var length = String(ArrayOptFirstElem(activities).nums)
     var i = 0
     var activity, res
     for (activity in activities) {
         i++
 
+        addLog("")
         addLog(i + " из " + length)
         addLog("Адаптация: " + activity.adaptation_id)
         addLog(activity.task_id + " " + activity.task_name)
         addLog(activity.person_fullname + " " + activity.person_id)
         addLog("Код курса: " + activity.code)
-        res = loadLearning(activity.person_id, activity.code)
+        res = ADAPTATION.loadLearning(activity.person_id, activity.code, libs)
         addLog(tools.object_to_text(res, 'json'))
-        addLog("")
     }
 }
 
