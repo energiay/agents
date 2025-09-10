@@ -128,7 +128,7 @@ function loadScToAdaptations() {
         addLog(activity.task_id + " " + activity.task_name)
         addLog(activity.person_fullname + " " + activity.person_id)
         addLog("Код курса: " + activity.code)
-        res = ADAPTATION.loadLearning(activity.person_id, activity.code, libs)
+        res = ADAPTATION.loadScLearning(activity.person_id, activity.code, libs)
         addLog(tools.object_to_text(res, 'json'))
     }
 }
