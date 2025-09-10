@@ -19,7 +19,7 @@ function addLog(value, name) {
  */
 function getSkillCupLib() {
     var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
-    return OpenCodeLib(sc_path)
+    return OpenCodeLib(sc_path).clear()
 }
 
 /**
@@ -29,7 +29,7 @@ function getSkillCupLib() {
  */
 function getLearningLib() {
     var learning_path = 'x-local://wt/web/custom_projects/libs/learning_lib.js'
-    return OpenCodeLib(learning_path)
+    return OpenCodeLib(learning_path).clear()
 }
 
 /**
@@ -38,7 +38,7 @@ function getLearningLib() {
  */
 function getAdaptationLib() {
     var adaptation_path = 'x-local://wt/web/custom_projects/razum_common/'
-    return OpenCodeLib(adaptation_path + 'razum_common_lib.js')
+    return OpenCodeLib(adaptation_path + 'razum_common_lib.js').clear()
 }
 
 /**
