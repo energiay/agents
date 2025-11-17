@@ -83,6 +83,24 @@ function getCourse(activity) {
 }
 
 /**
+ * Пытается открыть карточку документа по идентификатору.
+ *
+ * В случае успеха возвращает документ карточки.
+ * Если возникает ошибка — возвращает `null`.
+ *
+ * @param {number|string} id - Идентификатор документа.
+ * @returns {XmElem|null} Карточка документа, если успешно открыт, иначе `null`.
+ */
+function optOpenDoc(id) {
+    try {
+        return OpenDoc(UrlFromDocID(Int(id)))
+    }
+    catch(err) {}
+
+    return null
+}
+
+/**
  * Устанавливает активности обучения для адаптации сотрудника
  * @param {Object} adaptation - Объект адаптации сотрудника
  * @param {number|string} adaptation.id - Идентификатор документа адаптации
@@ -92,7 +110,13 @@ function getCourse(activity) {
 function setActivities(adaptation) {
     var libs = {sc: SC, learning: LEARNING}
 
-    var tasks = OpenDoc(UrlFromDocID(Int(adaptation.id))).TopElem.tasks
+    var card = optOpenDoc(adaptation.id)
+    if (card == null) {
+        addLog("Не удалось открыть карточку адаптации: " + adaptation.id)
+        return
+    }
+
+    var tasks = card.TopElem.tasks
     var where = "This.type == 'learning' && This.status != 'passed'"
     var activities = ArraySelect(tasks, where)
     if (ArrayOptFirstElem(activities) == undefined) {
