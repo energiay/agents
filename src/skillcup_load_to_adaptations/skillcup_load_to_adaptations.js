@@ -133,6 +133,8 @@ function loadScToAdaptations() {
         addLog("")
         addLog("")
         addLog("Обработано адаптаций: " + i + " из " + length)
+        addLog("")
+        addLog("")
         addLog("Адаптация: " + adaptation.id)
         addLog(adaptation.person_id + " " + adaptation.person_fullname)
         setActivities(adaptation)
