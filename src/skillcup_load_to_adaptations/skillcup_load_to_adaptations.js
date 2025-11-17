@@ -47,6 +47,7 @@ function getAdaptationLib() {
  */
 function getScActivitiesFromAdaptations() {
     var query = (
+        "\n" +
         "SELECT \n" +
         "    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS nums, \n" +
         "    crs.id, \n" +
