@@ -47,90 +47,100 @@ function getAdaptationLib() {
  */
 function getScActivitiesFromAdaptations() {
     var query = (
-        "\n" +
         "SELECT \n" +
         "    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS nums, \n" +
-        "    crs.id AS adaptation_id, \n" +
+        "    crs.id, \n" +
         "    crs.person_id, \n" +
         "    person.code AS person_code, \n" +
-        "    crs.person_fullname, \n" +
-        "    t.query('name').value('.', 'varchar(max)') AS task_name, \n" +
-        "    t.query('id').value('.', 'varchar(max)') AS task_id, \n" +
-        "    cs.code \n" +
+        "    crs.person_fullname \n" +
         "FROM career_reserves AS crs \n" +
-        "LEFT JOIN career_reserve AS cr ON cr.id=crs.id \n" +
-        "LEFT JOIN collaborators AS person ON person.id=crs.person_id \n" +
-        "CROSS APPLY cr.data.nodes('career_reserve/tasks/task') AS t(t) \n" +
-        "LEFT JOIN courses AS cs ON " +
-                            "cs.id=t.query('object_id').value('.', 'bigint') \n" +
-        "WHERE crs.status in ('active') \n" +
-        "AND t.query('type').value('.', 'varchar(max)') = 'learning' \n" +
-        "AND t.query('status').value('.', 'varchar(max)') <> 'passed' \n" +
-        "AND cs.code LIKE 'SC[_]%' \n" +
-        "AND cs.code IS NOT NULL \n" +
-        "ORDER BY nums DESC"
+        "INNER JOIN collaborators AS person ON person.id=crs.person_id \n" +
+        "WHERE crs.status = 'active' \n" +
+        "ORDER BY nums DESC \n"
     )
     addLog(query)
 
-    var activities = XQuery("sql: " + query)
-    if (ArrayOptFirstElem(activities) == undefined) {
-        return []
-    }
-
-    return activities
+    return XQuery("sql: " + query)
 }
 
 /**
- * Загрузка данных по одному тренингу конкретного пользователя
- * @param {string} username - Идентификатор сотрудника
- * @param {string} code - Код курса (пример, SC_monobrand_<uuid>)
-function loadLearning(person, code) {
-    // загрузить данные из Skill Cup
-    var response = SC.loadTrainingForUser(person, code)
-    if (!response.success) {
-        return response
-    }
-
-    // Создать/обновить карточку курса в WT
-    var settings = {force: true, channel: response.data.channel}
-    var training = response.data.training
-    var learning = LEARNING.learningOfSkillCup(person, training, settings)
-    if (!learning.success) {
-        return learning
-    }
-
-    // Проставить карточку курса в активность адаптации
-    ADAPTATION.execCard(learning.card.TopElem)
-
-    return {success: true}
-}
+ * Возвращает курс из кеша или добавляет его, если он отсутствует.
+ * @param {Object} activity - Объект активности с идентификатором курса.
+ * @returns {Object} - курс
  */
+function getCourse(activity) {
+    var id = activity.object_id
+    if (COURSE_CACHE.GetOptProperty(String(id)) == undefined) {
+        COURSE_CACHE[String(id)] = {
+            code: activity.object_id.ForeignElem.code,
+            name: activity.object_id.ForeignElem.name,
+            success: StrBegins(String(activity.object_id.ForeignElem.code), "SC_")
+        }
+    }
+
+    return COURSE_CACHE.GetOptProperty(String(id))
+}
 
 /**
- * Загрузить активности skill cup
- */
-function loadScToAdaptations() {
-    var activities = getScActivitiesFromAdaptations()
+ * Устанавливает активности обучения для адаптации сотрудника
+ * @param {Object} adaptation - Объект адаптации сотрудника
+ * @param {number|string} adaptation.id - Идентификатор документа адаптации
+ * @param {number|string} adaptation.person_id - Идентификатор сотрудника
+ * @returns {void}
+*/
+function setActivities(adaptation) {
+    var libs = {sc: SC, learning: LEARNING}
+
+    var tasks = OpenDoc(UrlFromDocID(Int(adaptation.id))).TopElem.tasks
+    var where = "This.type == 'learning' && This.status != 'passed'"
+    var activities = ArraySelect(tasks, where)
     if (ArrayOptFirstElem(activities) == undefined) {
+        addLog("В адаптации отсутствуют активные курсы.")
         return
     }
 
-    var libs = {sc: SC, learning: LEARNING}
-    var length = String(ArrayOptFirstElem(activities).nums)
-    var i = 0
-    var activity, res
+    var activity, res, course
     for (activity in activities) {
-        i++
+        course = getCourse(activity)
+        if (course.success == false) {
+            continue
+        }
 
         addLog("")
-        addLog(i + " из " + length)
-        addLog("Адаптация: " + activity.adaptation_id)
-        addLog(activity.task_id + " " + activity.task_name)
-        addLog(activity.person_fullname + " " + activity.person_id)
-        addLog("Код курса: " + activity.code)
-        res = ADAPTATION.loadScLearning(activity.person_id, activity.code, libs)
+        addLog(activity.id + " " + activity.name)
+        addLog(activity.object_id + " " + course.code + " " + course.name)
+
+        res = ADAPTATION.loadScLearning(adaptation.person_id, course.code, libs)
         addLog(tools.object_to_text(res, 'json'))
     }
+}
+
+/**
+ * Загрузка активностей SkillCup в адаптации
+ * @returns {void}
+*/
+function loadScToAdaptations() {
+    var adaptations = getScActivitiesFromAdaptations()
+    if (ArrayOptFirstElem(adaptations) == undefined) {
+        return
+    }
+
+    var length = String(ArrayOptFirstElem(adaptations).nums)
+    var i = 0
+
+    var adaptation
+    for (adaptation in adaptations) {
+        addLog("")
+        addLog("")
+        addLog("Обработано адаптаций: " + i + " из " + length)
+        addLog("Адаптация: " + adaptation.id)
+        addLog(adaptation.person_id + " " + adaptation.person_fullname)
+        setActivities(adaptation)
+        i++
+    }
+
+    addLog("")
+    addLog("Обработано адаптаций: " + length)
 }
 
 
@@ -141,6 +151,7 @@ try {
     var SC = getSkillCupLib()
     var LEARNING = getLearningLib()
     var ADAPTATION = getAdaptationLib()
+    var COURSE_CACHE = {}
 
     loadScToAdaptations()
 } catch (err) {
