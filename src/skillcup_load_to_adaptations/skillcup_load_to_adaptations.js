@@ -112,7 +112,7 @@ function setActivities(adaptation) {
 
     var card = optOpenDoc(adaptation.id)
     if (card == null) {
-        addLog("Не удалось открыть карточку адаптации: " + adaptation.id)
+        addLog("error: Не удалось открыть карточку адаптации: " + adaptation.id)
         return
     }
 
