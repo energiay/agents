@@ -65,6 +65,21 @@ function getScActivitiesFromAdaptations() {
 }
 
 /**
+ * Возвращает значение внешнего элемента по указанному полю
+ * @param {Object} obj - Объект, содержащий внешний элемент
+ * @param {string} field - Название поля для получения значения
+ * @returns {string|null} - Значение поля или null, если элемент не найден
+ */
+function getForeign(obj, field) {
+    var foreign = obj.OptForeignElem
+    if (foreign == null) {
+        return null
+    }
+
+    return foreign.GetOptProperty(field)
+}
+
+/**
  * Возвращает курс из кеша или добавляет его, если он отсутствует.
  * @param {Object} activity - Объект активности с идентификатором курса.
  * @returns {Object} - курс
@@ -72,10 +87,16 @@ function getScActivitiesFromAdaptations() {
 function getCourse(activity) {
     var id = activity.object_id
     if (COURSE_CACHE.GetOptProperty(String(id)) == undefined) {
+        var name = getForeign(id, "name")
+        var code = getForeign(id, "code")
+        if (code == null) {
+            addLog("warn: не найден object_id " + id)
+        }
+
         COURSE_CACHE[String(id)] = {
-            code: activity.object_id.ForeignElem.code,
-            name: activity.object_id.ForeignElem.name,
-            success: StrBegins(String(activity.object_id.ForeignElem.code), "SC_")
+            success: StrBegins(String(code), "SC_"),
+            code: code,
+            name: name,
         }
     }
 
@@ -167,7 +188,7 @@ function loadScToAdaptations() {
     }
 
     addLog("")
-    addLog("Обработано адаптаций: " + length)
+    addLog("Обработано адаптаций: " + i)
 }
 
 
