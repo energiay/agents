@@ -85,22 +85,26 @@ function getForeign(obj, field) {
  * @returns {Object} - курс
  */
 function getCourse(activity) {
-    var id = activity.object_id
-    if (COURSE_CACHE.GetOptProperty(String(id)) == undefined) {
-        var name = getForeign(id, "name")
-        var code = getForeign(id, "code")
+    var ID = activity.object_id
+
+    if (COURSE_CACHE.GetOptProperty(String(ID)) == undefined) {
+        // получение данных
+        var name = getForeign(ID, "name")
+        var code = getForeign(ID, "code")
         if (code == null) {
-            addLog("warn: не найден object_id " + id)
+            addLog("warn: не найден object_id " + ID)
         }
 
-        COURSE_CACHE[String(id)] = {
+        // записать данные в кэш
+        COURSE_CACHE[String(ID)] = {
             success: StrBegins(String(code), "SC_"),
             code: code,
             name: name,
         }
     }
 
-    return COURSE_CACHE.GetOptProperty(String(id))
+    // вернуть данные из кэша
+    return COURSE_CACHE.GetOptProperty(String(ID))
 }
 
 /**
@@ -137,6 +141,7 @@ function setActivities(adaptation) {
         return
     }
 
+    // получение активностей
     var tasks = card.TopElem.tasks
     var where = "This.type == 'learning' && This.status != 'passed'"
     var activities = ArraySelect(tasks, where)
@@ -148,7 +153,7 @@ function setActivities(adaptation) {
     var activity, res, course
     for (activity in activities) {
         course = getCourse(activity)
-        if (course.success == false) {
+        if (!course.success) {
             continue
         }
 
