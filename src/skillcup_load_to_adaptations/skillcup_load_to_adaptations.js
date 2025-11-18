@@ -72,7 +72,7 @@ function getScActivitiesFromAdaptations() {
  */
 function getForeign(obj, field) {
     var foreign = obj.OptForeignElem
-    if (foreign == null) {
+    if (foreign == undefined) {
         return null
     }
 
