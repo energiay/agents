@@ -18,7 +18,6 @@ function addLog(value, name) {
  * @returns {array}
  */
 function getData() {
-    //DropFormsCache("x-local://wt/web/custom_projects/libs/sql_lib_dev.js")
     var sql_lib = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
 
     var ssql = (
