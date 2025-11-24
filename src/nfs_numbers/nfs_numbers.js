@@ -19,7 +19,6 @@ function addLog(value, name) {
  */
 function getData() {
     var sql_lib = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
-
     var ssql = (
         "SELECT Trunc(Sysdate) discharge_base_date, t.* \n" +
         "FROM TABLE ( \n" +
