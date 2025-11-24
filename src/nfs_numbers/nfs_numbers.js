@@ -97,29 +97,32 @@ function addRecord(data) {
  */
 function getInsertData(rec) {
     var discharge_base_date = rec.GetOptProperty("DISCHARGE_BASE_DATE")
+    var hire_date = rec.GetOptProperty("HIRE_DATE")
+    var obj_pos_start_date = rec.GetOptProperty("OBJECTIVE_POSITION_START_DATE")
+    var fire_date = rec.GetOptProperty("FIRE_DATE")
 
     return (
         "CONVERT(datetime2, '" + discharge_base_date + "', 104)" + "," +
         "'" + rec.GetOptProperty("REGION") + "', " +
         "'" + rec.GetOptProperty("FILIAL") + "', " +
-        "'город', " +
-        "'area', " +
-        "'locality', " +
-        "'0138', " +
-        "'111', " +
-        "'222',  " +
-        "'Tulinov Ivan Vladimirovich', " +
-        "'1', " +
-        "'group name', " +
-        "GETDATE(), " +
-        "null, " +
-        "GETDATE(), " +
-        "'obj_pos_code', " +
-        "'obj_pos_name', " +
-        "'pos_name', " +
-        "999, " +
-        "888, " +
-        "777 "
+        "'" + rec.GetOptProperty("CITY") + "', " +
+        "'" + rec.GetOptProperty("AREA") + "', " +
+        "'" + rec.GetOptProperty("LOCALITY") + "', " +
+        "'" + rec.GetOptProperty("CBO") + "', " +
+        "'" + rec.GetOptProperty("ASSIGNMENT_NUMBER") + "', " +
+        "'" + rec.GetOptProperty("EMPLOYEE_NUMBER") + "', " +
+        "'" + rec.GetOptProperty("FULL_NAME") + "', " +
+        "'" + rec.GetOptProperty("GROUP_CODE") + "', " +
+        "'" + rec.GetOptProperty("GROUP_NAME") + "', " +
+        "CONVERT(datetime2, '" + hire_date + "', 104)" + "," +
+        "CONVERT(datetime2, '" + obj_pos_start_date + "', 104)" + "," +
+        "CONVERT(datetime2, '" + fire_date + "', 104)" + "," +
+        "'" + rec.GetOptProperty("OBJECTIVE_POSITION_CODE") + "', " +
+        "'" + rec.GetOptProperty("OBJECTIVE_POSITION_NAME") + "', " +
+        "'" + rec.GetOptProperty("POSITION_NAME") + "', " +
+        "" + rec.GetOptProperty("POSITION_ID") + ", " +
+        "" + rec.GetOptProperty("PERSON_ID") + ", " +
+        "" + rec.GetOptProperty("ASSIGNMENT_ID")
     )
 }
 
