@@ -80,7 +80,7 @@ function addRecord(data) {
         "SELECT @@ROWCOUNT AS 'rowcount'"
     )
 
-    addLog(query)
+    //addLog(query)
 
     var result = ArrayOptFirstElem(XQuery("sql: " + query))
     var count = OptInt(result.GetOptProperty("rowcount"), 0)
@@ -176,12 +176,12 @@ function clear() {
 
 //entry point
 try {
-    addLog("begin")
+    //addLog("begin")
 
     clear()
     load()
 
-    addLog("end")
+    //addLog("end")
 }
 catch(err) {
     addLog("ERROR: " + err)
