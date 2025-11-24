@@ -136,11 +136,13 @@ function getInsertData(rec) {
  * Обрабатывает и добавляет записи данных из НФС в LMS.
  */
 function load() {
+    addLog("Получение данных из ФНС")
     var data = getData() // данные из НФС
 
     var i = 0
     var insertDatas = []
 
+    addLog("Добавление данных:")
     var record, insertData
     for (record in data) {
         i++
@@ -153,7 +155,7 @@ function load() {
         if (i >= 900) {
             addRecord(insertDatas)  // добавляем записи в БД
             i = 0                   // обнуляем счетчик
-            insertDatas = []        // обнуляем данные
+            insertDatas = []        // обнуляем записи
         }
     }
 
@@ -167,6 +169,7 @@ function load() {
  * Очищает таблицу [WTDB].[dbo].[c_nfs_numbers].
  */
 function clear() {
+    addLog("Очистка таблицы [WTDB].[dbo].[c_nfs_numbers]")
     var query = "TRUNCATE TABLE [WTDB].[dbo].[c_nfs_numbers]"
     ArrayOptFirstElem(XQuery("sql: " + query))
 }
