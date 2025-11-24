@@ -80,7 +80,7 @@ function addRecord(data) {
         "SELECT @@ROWCOUNT AS 'rowcount'"
     )
 
-    //addLog(query)
+    addLog(query)
 
     var result = ArrayOptFirstElem(XQuery("sql: " + query))
     var count = OptInt(result.GetOptProperty("rowcount"), 0)
@@ -91,18 +91,26 @@ function addRecord(data) {
 }
 
 /**
+ * Форматирует дату для SQL запроса.
+ * @param {string|undefined} date - Дата для форматирования.
+ * @returns {string} Отформатированная дата или 'null'.
+ */
+function getDate(date) {
+    if (String(date) == "" || date == undefined) {
+        return "null"
+    }
+
+    return "CONVERT(datetime2, '" + date + "', 104)"
+}
+
+/**
  * Формирует строку значений для SQL-запроса INSERT.
  * @param {object} rec - Объект записи с данными.
  * @returns {string} Строка отформатированных значений для SQL-запроса.
  */
 function getInsertData(rec) {
-    var discharge_base_date = rec.GetOptProperty("DISCHARGE_BASE_DATE")
-    var hire_date = rec.GetOptProperty("HIRE_DATE")
-    var obj_pos_start_date = rec.GetOptProperty("OBJECTIVE_POSITION_START_DATE")
-    var fire_date = rec.GetOptProperty("FIRE_DATE")
-
     return (
-        "CONVERT(datetime2, '" + discharge_base_date + "', 104)" + "," +
+        "" + getDate(rec.GetOptProperty("DISCHARGE_BASE_DATE")) + "," +
         "'" + rec.GetOptProperty("REGION") + "', " +
         "'" + rec.GetOptProperty("FILIAL") + "', " +
         "'" + rec.GetOptProperty("CITY") + "', " +
@@ -114,9 +122,9 @@ function getInsertData(rec) {
         "'" + rec.GetOptProperty("FULL_NAME") + "', " +
         "'" + rec.GetOptProperty("GROUP_CODE") + "', " +
         "'" + rec.GetOptProperty("GROUP_NAME") + "', " +
-        "CONVERT(datetime2, '" + hire_date + "', 104)" + "," +
-        "CONVERT(datetime2, '" + obj_pos_start_date + "', 104)" + "," +
-        "CONVERT(datetime2, '" + fire_date + "', 104)" + "," +
+        "" + getDate(rec.GetOptProperty("HIRE_DATE")) + "," +
+        "" + getDate(rec.GetOptProperty("OBJECTIVE_POSITION_START_DATE")) + "," +
+        "" + getDate(rec.GetOptProperty("FIRE_DATE")) + "," +
         "'" + rec.GetOptProperty("OBJECTIVE_POSITION_CODE") + "', " +
         "'" + rec.GetOptProperty("OBJECTIVE_POSITION_NAME") + "', " +
         "'" + rec.GetOptProperty("POSITION_NAME") + "', " +
