@@ -1,0 +1,25 @@
+--DROP TABLE [dbo].[c_nfs_numbers]
+CREATE TABLE [dbo].[c_nfs_numbers](
+    [discharge_base_date]   datetime NULL,
+    [region]                nvarchar(max) NULL,
+    [filial]                nvarchar(max) NULL,
+    [city]                  nvarchar(max) NULL,
+    [area]                  nvarchar(max) NULL,
+    [locality]              nvarchar(max) NULL,
+    [cbo]                   nvarchar(max) NULL,
+    [assignment_number]     nvarchar(max) NULL,
+    [employee_number]       nvarchar(max) NULL,
+    [full_name]             nvarchar(max) NULL,
+    [group_code]            nvarchar(max) NULL,
+    [group_name]            nvarchar(max) NULL,
+    [hire_date]             datetime NULL,
+    [objective_position_start_date] datetime NULL,
+    [fire_date]             datetime NULL,
+    [objective_position_code] nvarchar(max) NULL,
+    [objective_position_name] nvarchar(max) NULL,
+    [position_name]         nvarchar(max) NULL,
+    [position_id]           bigint NULL,
+    [person_id]             bigint NULL,
+    [assignment_id]         bigint NULL,
+    created                 datetime DEFAULT GETDATE()
+)
