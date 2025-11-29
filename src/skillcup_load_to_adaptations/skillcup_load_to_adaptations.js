@@ -48,7 +48,7 @@ function getAdaptationLib() {
 function getScActivitiesFromAdaptations() {
     var query = (
         "\n" +
-        "SELECT TOP 800 \n" +
+        "SELECT \n" +
         "    crs.id, \n" +
         "    crs.person_id, \n" +
         "    person.code AS person_code, \n" +
