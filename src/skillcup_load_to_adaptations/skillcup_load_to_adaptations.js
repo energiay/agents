@@ -19,7 +19,7 @@ function addLog(value, name) {
  */
 function getSkillCupLib() {
     var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
-    return OpenCodeLib(sc_path).clear()
+    return OpenCodeLib(sc_path)
 }
 
 /**
@@ -29,7 +29,7 @@ function getSkillCupLib() {
  */
 function getLearningLib() {
     var learning_path = 'x-local://wt/web/custom_projects/libs/learning_lib.js'
-    return OpenCodeLib(learning_path).clear()
+    return OpenCodeLib(learning_path)
 }
 
 /**
@@ -38,7 +38,7 @@ function getLearningLib() {
  */
 function getAdaptationLib() {
     var adaptation_path = 'x-local://wt/web/custom_projects/razum_common/'
-    return OpenCodeLib(adaptation_path + 'razum_common_lib.js').clear()
+    return OpenCodeLib(adaptation_path + 'razum_common_lib.js')
 }
 
 /**
@@ -48,16 +48,14 @@ function getAdaptationLib() {
 function getScActivitiesFromAdaptations() {
     var query = (
         "\n" +
-        "SELECT \n" +
-        "    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS nums, \n" +
+        "SELECT TOP 800 \n" +
         "    crs.id, \n" +
         "    crs.person_id, \n" +
         "    person.code AS person_code, \n" +
         "    crs.person_fullname \n" +
         "FROM career_reserves AS crs \n" +
         "INNER JOIN collaborators AS person ON person.id=crs.person_id \n" +
-        "WHERE crs.status = 'active' \n" +
-        "ORDER BY nums DESC \n"
+        "WHERE crs.status = 'active'"
     )
     addLog(query)
 
@@ -157,7 +155,6 @@ function setActivities(adaptation) {
             continue
         }
 
-        addLog("")
         addLog(activity.id + " " + activity.name)
         addLog(activity.object_id + " " + course.code + " " + course.name)
 
@@ -176,24 +173,13 @@ function loadScToAdaptations() {
         return
     }
 
-    var length = String(ArrayOptFirstElem(adaptations).nums)
-    var i = 0
-
     var adaptation
     for (adaptation in adaptations) {
-        addLog("")
-        addLog("")
-        addLog("Обработано адаптаций: " + i + " из " + length)
-        addLog("")
-        addLog("")
+        addLog(" ")
         addLog("Адаптация: " + adaptation.id)
         addLog(adaptation.person_id + " " + adaptation.person_fullname)
         setActivities(adaptation)
-        i++
     }
-
-    addLog("")
-    addLog("Обработано адаптаций: " + i)
 }
 
 
