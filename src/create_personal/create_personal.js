@@ -127,6 +127,11 @@ function setPerson(result, person) {
     return result
 }
 
+/**
+ * Главная функция
+ * @param {object} param - Параметры выполнения функции.
+ * @property {string} param.subs - Список подразделений.
+ */
 function main(param) {
     // получаем отработанное время сотрудников в разрезе офисов
     // и время работы офиса
