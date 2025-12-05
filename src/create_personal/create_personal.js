@@ -116,9 +116,10 @@ function setPerson(result, person) {
 
     var checkPersson = result.GetOptProperty(codePerson)
     if (checkPersson == undefined) {
-        result[codePerson] = {}
+        result[codePerson] = {length: 0}
     }
 
+    result[codePerson].length = result[codePerson].length + 1,
     result[codePerson][codeSubdiv] = {
         person_duration: OptInt(persDuration, null),
         sub_duration: OptInt(subDuration, null),
