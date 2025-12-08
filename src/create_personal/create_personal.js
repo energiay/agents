@@ -107,6 +107,12 @@ function getSubDuration(code) {
     return ArrayOptFirstElem(subdivision).duration_vacation
 }
 
+/**
+ * Устанавливает данные о сотруднике в результирующий объект.
+ * @param {object} result - Результирующий объект для добавления данных.
+ * @param {object} person - Объект, содержащий данные о сотруднике.
+ * @returns {object} Обновленный результирующий объект.
+ */
 function setPerson(result, person) {
     var codePerson = String(person.line_tab_num)
     var persDuration = String(person.duration_vacation)
