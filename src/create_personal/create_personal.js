@@ -13,6 +13,11 @@ function addLog(value, name) {
     LogEvent(sLogName, value)
 }
 
+/**
+ * Генерирует SQL-запрос для получения статистики по рабочим часам.
+ * @param {object} param - Объект, содержащий параметры для формирования запроса.
+ * @returns {string} Сформированный SQL-запрос.
+ */
 function getSql(param) {
     var tabNum = ",a.line_tab_num"
     if (param.GetOptProperty("type") == "subdivision") {
@@ -75,6 +80,11 @@ function getSql(param) {
     )
 }
 
+/**
+ * Получает данные о людях по подразделениям.
+ * @param {object} codes - Коды подразделений.
+ * @returns {object} Объект с данными найденных людей.
+ */
 function getPersons(codes) {
     var result = {}
 
@@ -89,6 +99,11 @@ function getPersons(codes) {
     return result
 }
 
+/**
+ * Получает продолжительность работы указанного подразделения.
+ * @param {string} code - Код подразделения.
+ * @returns {number | null} Продолжительность для указанного подразделения.
+ */
 function getSubDuration(code) {
     var result = SUBDIVISION.GetOptProperty(code)
     if (result != undefined) {
@@ -107,6 +122,110 @@ function getSubDuration(code) {
     return ArrayOptFirstElem(subdivision).duration_vacation
 }
 
+function getMetricsFromList(list) {
+    var result = []
+
+    var metric
+    for (metric in list) {
+        result.push(metric)
+    }
+
+    return result.join(",")
+}
+
+function getPersonMetric(person, branch, text) {
+    var begin = "2025-11-01"
+    var end = "2025-11-30"
+    var query = (
+        "select \n" +
+        "    sa.ym \n" +
+        "    , sa.user_tab_no \n" +
+        "    , sum(coalesce(qty*full_price_rur, qty*(unit_price+discount))) " +
+                                                                    "as fct \n" +
+        "from core.t_asale as sa \n" +
+        "join sb_motivation.dim_up_category_spec as mot \n" +
+                        "on lower(mot.up_category) = lower(sa.up_category) \n" +
+        "where 1=1 \n" +
+        "    and mot.metric_name ilike '" + text + "' \n" +
+        "    and sa.qty_up > 0 -- qty_up <> 0 -- с учетом возвратов \n" +
+        "    and sa.user_tab_no = '" + person + "' \n" +
+        "    and sa.branchcode = '" + branch + "' \n" +
+        "    and sa.operation_date::date between \n" +
+                        "date '" + begin + "' and date '" + end + "' \n" +
+        "group by 1,2"
+    )
+
+    var metric = ArrayOptFirstElem(SQL_LIB.optXExec(query, 'corecpu'))
+    if (metric == undefined) {
+        return null
+    }
+
+    return OptInt(metric.fct, null)
+}
+
+function getSqlMetricBranch(branch, LIST) {
+    var sMetrics = getMetricsFromList(LIST)
+
+    var begin = "2025-11-01"
+    var end = "2025-11-30 23:59:59"
+    return (
+        "\n" +
+        "select distinct \n" +
+        "    mt.description, \n" +
+        "    dd.department_full_name, \n" +
+        "    em.full_name, \n" +
+        "    dm.metric_id AS id, \n" +
+        "    dm.metric_name, \n" +
+        "    m.metric_value AS value \n" +
+        "from core.dwh_metric m \n" +
+        "left join core.dm_office_hist as dd " +
+                                    "on dd.department_id = m.entity_id_1 \n" +
+        "left join core.dm_emp_hist as em " +
+                                    "on em.emp_id  = m.entity_id_2 \n" +
+        "left join core.dim_metric_type as mt " +
+                                    "on mt.metric_type_id = m.metric_type_id \n" +
+        "left join core.dim_metric as dm on dm.metric_id = m.metric_id \n" +
+        "where m.metric_id in (" + sMetrics + ") \n" +
+        "and period_code  = 'm' \n" +
+        "and m.report_dt between date '" + begin + "' and date '" + end + "' \n" +
+        "and m.metric_type_id in (1) \n" +
+        "and dd.department_short_name = '" + branch + "'"
+    )
+}
+
+function getBranchMetrics(branch, listOfMetrics) {
+    if (METRICS_BRANCH.GetOptProperty(branch) != undefined) {
+        return METRICS_BRANCH.GetOptProperty(branch)
+    }
+
+    METRICS_BRANCH[branch] = {}
+
+    var query = getSqlMetricBranch(branch, listOfMetrics)
+    var metrics = SQL_LIB.optXExec(query, 'corecpu')
+
+    var metric
+    for (metric in metrics) {
+        METRICS_BRANCH[branch][String(metric.id)] = {
+            branch: OptInt(metric.value, null),
+        }
+    }
+
+    return METRICS_BRANCH.GetOptProperty(branch)
+}
+
+function getMetrics(person, branch) {
+    var listOfMetrics = getListOfMetrics()
+    var branchMetrics = getBranchMetrics(branch, listOfMetrics)
+
+    var metric, find
+    for (metric in branchMetrics) {
+        find = listOfMetrics.GetOptProperty(metric, {}).GetOptProperty("find")
+        branchMetrics[metric]["person"] = getPersonMetric(person, branch, find)
+    }
+
+    return branchMetrics
+}
+
 /**
  * Устанавливает данные о сотруднике в результирующий объект.
  * @param {object} result - Результирующий объект для добавления данных.
@@ -119,6 +238,7 @@ function setPerson(result, person) {
 
     var codeSubdiv = String(person.office_amdocs_code)
     var subDuration = getSubDuration(codeSubdiv)
+    var subMetrics = getMetrics(codePerson, codeSubdiv)
 
     var checkPersson = result.GetOptProperty(codePerson)
     if (checkPersson == undefined) {
@@ -129,6 +249,7 @@ function setPerson(result, person) {
     result[codePerson][codeSubdiv] = {
         person_duration: OptInt(persDuration, null),
         sub_duration: OptInt(subDuration, null),
+        metrics: subMetrics,
     }
 
     return result
@@ -146,6 +267,15 @@ function main(param) {
     addLog(tools.object_to_text(persons, 'json'))
 }
 
+function getListOfMetrics() {
+    return {
+        "303": {
+            name: "Товарная выручка",
+            find: "%товарная%"
+        }
+    }
+}
+
 // entry point
 // назначение/доназначение модульной программы
 try {
@@ -153,6 +283,9 @@ try {
 
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
     var SUBDIVISION = {}
+    var METRICS_BRANCH = {}
+    var METRICS_PERSON = {}
+
     main(Param)
 
     addLog("end")
