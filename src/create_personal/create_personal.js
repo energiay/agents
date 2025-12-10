@@ -59,6 +59,7 @@ function getSql(param) {
         "   and e.oper_date >= '2025-11-01' AND e.oper_date <= '2025-11-30' \n" +
         "   AND o.usage_mnemonic IN ('Я','ЯОО','ЯВ') \n" +
         "   and s.CODE_POINTS_SALE in (" + codes + " ) \n" +
+        "   --and p.person_number in ('273332') \n" +
         "   GROUP BY \n" +
         "       s.CODE_POINTS_SALE \n" +
         "       ,p.PERSON_NUMBER \n" +
@@ -80,23 +81,86 @@ function getSql(param) {
     )
 }
 
-/**
- * Получает данные о людях по подразделениям.
- * @param {object} codes - Коды подразделений.
- * @returns {object} Объект с данными найденных людей.
- */
+function getOneBranch(list) {
+    var code
+    for (code in list) {
+        if (code == 'length') {
+            continue
+        }
+
+        return [code, list[code]]
+    }
+
+    return null
+}
+
+function calcBranch(metrics, branch) {
+    var br = branch[1]
+
+    var code = branch[0]
+    if (metrics.GetOptProperty(code) == undefined) {
+        metrics[code] = {}
+    }
+
+    var time = Real(br.person_duration) / br.branch_duration
+    var weightedAverage = (Real(br.person_duration) * time * 1) / 100
+
+    var metricId, metric, personPlan
+    for (metricId in br.metrics) {
+        metric = br.metrics[metricId]
+
+        personPlan = metric.branch * weightedAverage
+        if (personPlan == 0) {
+            addLog(
+                "План сотрудника не может быть равен нулю: " +
+                tools.object_to_text(branch, 'json')
+            )
+            metrics[code][metricId] = null
+            continue
+        }
+
+        personResult = Real(metric.person) / personPlan
+        metrics[code][metricId] = (personResult * 100)
+    }
+
+    return metrics
+}
+
+function calcOneBranch(metrics, branches) {
+    var branch = getOneBranch(branches)
+    return calcBranch(metrics, branch)
+}
+
+function calcMetrics(metrics, branches) {
+    if (branches.length == 0) {
+        return null
+    }
+
+    if (branches.length == 1) {
+        return calcOneBranch(metrics, branches)
+    }
+
+    return null
+}
+
 function getPersons(codes) {
-    var result = {}
+    var calculate = {}
+    var metrics = {}
 
     var query = getSql({codes: codes})
     var persons = SQL_LIB.optXExec(query, 'corecpu')
 
     var person, code
     for (person in persons) {
-        result = setPerson(result, person)
+        calculate = setPerson(calculate, person)
+
+        code = String(person.line_tab_num)
+        metrics = calcMetrics(metrics, calculate.GetOptProperty(code))
+        break
     }
 
-    return result
+
+    return [calculate, metrics]
 }
 
 /**
@@ -133,7 +197,7 @@ function getMetricsFromList(list) {
     return result.join(",")
 }
 
-function getPersonMetric(person, branch, text) {
+function getPersonMetric(person, branch, find) {
     var begin = "2025-11-01"
     var end = "2025-11-30"
     var query = (
@@ -146,7 +210,7 @@ function getPersonMetric(person, branch, text) {
         "join sb_motivation.dim_up_category_spec as mot \n" +
                         "on lower(mot.up_category) = lower(sa.up_category) \n" +
         "where 1=1 \n" +
-        "    and mot.metric_name ilike '" + text + "' \n" +
+        "    and mot.metric_name ilike '" + find + "' \n" +
         "    and sa.qty_up > 0 -- qty_up <> 0 -- с учетом возвратов \n" +
         "    and sa.user_tab_no = '" + person + "' \n" +
         "    and sa.branchcode = '" + branch + "' \n" +
@@ -193,9 +257,32 @@ function getSqlMetricBranch(branch, LIST) {
     )
 }
 
+/**
+ * Создает глубокую копию объекта.
+ * Работает только для примитивов и объектов с примитивами.
+ *
+ * @param {object} obj - Исходный объект для копирования.
+ * @returns {object} Новая глубокая копия объекта.
+ */
+function createObject(obj) {
+    var result = {}
+
+    var field
+    for (field in obj) {
+        if (DataType(obj[field]) == 'object') {
+            result[field] = createObject(obj[field])
+            continue
+        }
+
+        result[field] = obj[field]
+    }
+
+    return result
+}
+
 function getBranchMetrics(branch, listOfMetrics) {
     if (METRICS_BRANCH.GetOptProperty(branch) != undefined) {
-        return METRICS_BRANCH.GetOptProperty(branch)
+        return createObject(METRICS_BRANCH.GetOptProperty(branch))
     }
 
     METRICS_BRANCH[branch] = {}
@@ -210,7 +297,7 @@ function getBranchMetrics(branch, listOfMetrics) {
         }
     }
 
-    return METRICS_BRANCH.GetOptProperty(branch)
+    return createObject(METRICS_BRANCH.GetOptProperty(branch))
 }
 
 function getMetrics(person, branch) {
@@ -248,7 +335,7 @@ function setPerson(result, person) {
     result[codePerson].length = result[codePerson].length + 1,
     result[codePerson][codeSubdiv] = {
         person_duration: OptInt(persDuration, null),
-        sub_duration: OptInt(subDuration, null),
+        branch_duration: OptInt(subDuration, null),
         metrics: subMetrics,
     }
 
@@ -261,8 +348,7 @@ function setPerson(result, person) {
  * @property {string} param.subs - Список подразделений.
  */
 function main(param) {
-    // получаем отработанное время сотрудников в разрезе офисов
-    // и время работы офиса
+    // получаем данные по сотрудникам
     var persons = getPersons(param.subs)
     addLog(tools.object_to_text(persons, 'json'))
 }
@@ -284,7 +370,6 @@ try {
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
     var SUBDIVISION = {}
     var METRICS_BRANCH = {}
-    var METRICS_PERSON = {}
 
     main(Param)
 
