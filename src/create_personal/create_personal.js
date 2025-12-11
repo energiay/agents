@@ -81,19 +81,14 @@ function getPersonsSql(param) {
     )
 }
 
-/**
- * Получает первую пару ключ-значение из объекта.
- * @param {object} list - Объект для обработки.
- * @returns {Array|null} Первая пара ключ-значение или null.
- */
-function getOneBranch(list) {
+function getBranchCode(list) {
     var code
     for (code in list) {
         if (code == 'length') {
             continue
         }
 
-        return [code, list[code]]
+        return code
     }
 
     return null
@@ -137,16 +132,33 @@ function calcBranch(code, branches) {
     return metrics
 }
 
-/**
- * Вычисляет показатели для одного подразделения.
- * @param {object} metrics
- * @param {Array} branches
- * @returns {object}
-function calcOneBranch(metrics, person, calculate) {
-    var branch = getOneBranch(branches)
-    return calcBranch(metrics, branch)
+function calcOneMetrics(data) {
+    // извлекаем данные
+    var personCode = data.personCode
+    var branchCode = getBranchCode(data.branches[personCode])
+    var branches = data.metrics.GetOptProperty(personCode, {})
+    var value = branches.GetOptProperty(branchCode)
+
+    return OptInt(value, null)
 }
- */
+
+function calcTwoMetrics(data) {
+    var personCode = data.personCode
+
+    //var value = branches.GetOptProperty(branchCode)
+
+    return OptInt(value, null)
+}
+
+function calcMetrics(data) {
+    if (data.branches.length == 1) {
+        return calcOneMetrics(data)
+    }
+
+    if (data.branches.length == 2) {
+        return calcTwoMetrics(data)
+    }
+}
 
 /**
  * Устанавливает метрики для сотрудника, вычисляя данные по подразделениям.
@@ -170,6 +182,12 @@ function setMetricsPerson(metrics, person, calculate) {
 
         metrics[personCode][branchCode] = calcBranch(branchCode, branches)
     }
+
+    metrics[personCode]["result"] = calcMetrics({
+        personCode: personCode,
+        branches: branches,
+        metrics: metrics,
+    })
 
     return metrics
 }
