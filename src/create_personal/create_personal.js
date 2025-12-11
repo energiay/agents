@@ -18,7 +18,7 @@ function addLog(value, name) {
  * @param {object} param - Объект, содержащий параметры для формирования запроса.
  * @returns {string} Сформированный SQL-запрос.
  */
-function getSql(param) {
+function getPersonsSql(param) {
     var tabNum = ",a.line_tab_num"
     if (param.GetOptProperty("type") == "subdivision") {
         tabNum = ""
@@ -81,6 +81,11 @@ function getSql(param) {
     )
 }
 
+/**
+ * Получает первую пару ключ-значение из объекта.
+ * @param {object} list - Объект для обработки.
+ * @returns {Array|null} Первая пара ключ-значение или null.
+ */
 function getOneBranch(list) {
     var code
     for (code in list) {
@@ -94,71 +99,98 @@ function getOneBranch(list) {
     return null
 }
 
-function calcBranch(metrics, branch) {
-    var br = branch[1]
+/**
+ * Вычисляет метрики для подразделения.
+ * @param {string} code - Табельный номер сотрудника.
+ * @param {object} branches - Объект с подразделениями.
+ * @returns {object|null} Вычисленные метрики или null, если данные отсутствуют.
+ */
+function calcBranch(code, branches) {
+    var metrics = {}
 
-    var code = branch[0]
-    if (metrics.GetOptProperty(code) == undefined) {
-        metrics[code] = {}
+    var data = branches.GetOptProperty(code)
+    if (data.person_duration == null || data.branch_duration == null) {
+        return null
     }
 
-    var time = Real(br.person_duration) / br.branch_duration
-    var weightedAverage = (Real(br.person_duration) * time * 1) / 100
+    var time = Real(data.person_duration) / data.branch_duration
+    var weightedAverage = (Real(data.person_duration) * time * 1) / 100
 
     var metricId, metric, personPlan
-    for (metricId in br.metrics) {
-        metric = br.metrics[metricId]
+    for (metricId in data.metrics) {
+        metric = data.metrics[metricId]
+        if (metric.branch == null || weightedAverage == null) {
+            metrics[metricId] = null
+            continue
+        }
 
         personPlan = metric.branch * weightedAverage
-        if (personPlan == 0) {
-            addLog(
-                "План сотрудника не может быть равен нулю: " +
-                tools.object_to_text(branch, 'json')
-            )
-            metrics[code][metricId] = null
+        if (personPlan == 0 || metric.person == null) {
+            metrics[metricId] = null
             continue
         }
 
         personResult = Real(metric.person) / personPlan
-        metrics[code][metricId] = (personResult * 100)
+        metrics[metricId] = (personResult * 100)
     }
 
     return metrics
 }
 
-function calcOneBranch(metrics, branches) {
+/**
+ * Вычисляет показатели для одного подразделения.
+ * @param {object} metrics
+ * @param {Array} branches
+ * @returns {object}
+function calcOneBranch(metrics, person, calculate) {
     var branch = getOneBranch(branches)
     return calcBranch(metrics, branch)
 }
+ */
 
-function calcMetrics(metrics, branches) {
-    if (branches.length == 0) {
-        return null
+/**
+ * Устанавливает метрики для сотрудника, вычисляя данные по подразделениям.
+ * @param {object} metrics - Объект для хранения вычисленных метрик.
+ * @param {object} person - Данные по сотруднику.
+ * @param {object} calculate - Объект, содержащий данные для вычислений.
+ * @returns {object}
+ */
+function setMetricsPerson(metrics, person, calculate) {
+    var personCode = String(person.line_tab_num)
+    if (metrics.GetOptProperty(code) == undefined) {
+        metrics[personCode] = {}
     }
 
-    if (branches.length == 1) {
-        return calcOneBranch(metrics, branches)
+    var branches = calculate.GetOptProperty(personCode)
+    var branchCode
+    for (branchCode in branches) {
+        if (branchCode == 'length') {
+            continue
+        }
+
+        metrics[personCode][branchCode] = calcBranch(branchCode, branches)
     }
 
-    return null
+    return metrics
 }
 
-function getPersons(codes) {
+/**
+ * Вычисляет метрики для заданных кодов.
+ * @param {string} codes - коды подразделений, для подстановки в sql
+ * @returns {Array<object>}
+ */
+function getMetricsOfBranches(codes) {
     var calculate = {}
     var metrics = {}
 
-    var query = getSql({codes: codes})
+    var query = getPersonsSql({codes: codes})
     var persons = SQL_LIB.optXExec(query, 'corecpu')
 
     var person, code
     for (person in persons) {
-        calculate = setPerson(calculate, person)
-
-        code = String(person.line_tab_num)
-        metrics = calcMetrics(metrics, calculate.GetOptProperty(code))
-        break
+        calculate = setDataPerson(calculate, person)
+        metrics = setMetricsPerson(metrics, person, calculate)
     }
-
 
     return [calculate, metrics]
 }
@@ -174,7 +206,7 @@ function getSubDuration(code) {
         return result
     }
 
-    var query = getSql({type: "subdivision", codes: SqlLiteral(code)})
+    var query = getPersonsSql({type: "subdivision", codes: SqlLiteral(code)})
     var subdivision = SQL_LIB.optXExec(query, 'corecpu')
 
     if (ArrayOptFirstElem(subdivision) == undefined) {
@@ -197,6 +229,13 @@ function getMetricsFromList(list) {
     return result.join(",")
 }
 
+/**
+ * Получает факт сотрудника по филиалу
+ * @param {string} person - Табельный номер сотрудника.
+ * @param {string} branch - Код филиала.
+ * @param {string} find - Строка для поиска метрики
+ * @returns {number|null} Значение метрики или null, если не найдено.
+ */
 function getPersonMetric(person, branch, find) {
     var begin = "2025-11-01"
     var end = "2025-11-30"
@@ -227,6 +266,12 @@ function getPersonMetric(person, branch, find) {
     return OptInt(metric.fct, null)
 }
 
+/**
+ * Формирует SQL-запрос для получения метрик по филиалу.
+ * @param {string} branch - Код филиала.
+ * @param {object} LIST - Список метрик.
+ * @returns {string} SQL-запрос в виде строки.
+ */
 function getSqlMetricBranch(branch, LIST) {
     var sMetrics = getMetricsFromList(LIST)
 
@@ -280,6 +325,12 @@ function createObject(obj) {
     return result
 }
 
+/**
+ * Получает метрики для подразделения из кеша или базы данных.
+ * @param {string} branch - Идентификатор ветки.
+ * @param {object} listOfMetrics - Список идентификаторов метрик.
+ * @returns {object} Объект с метриками ветки.
+ */
 function getBranchMetrics(branch, listOfMetrics) {
     if (METRICS_BRANCH.GetOptProperty(branch) != undefined) {
         return createObject(METRICS_BRANCH.GetOptProperty(branch))
@@ -300,6 +351,12 @@ function getBranchMetrics(branch, listOfMetrics) {
     return createObject(METRICS_BRANCH.GetOptProperty(branch))
 }
 
+/**
+ * Получает метрики для указанного сотрудника и филиала.
+ * @param {string} person - Идентификатор сотрудника.
+ * @param {string} branch - Идентификатор филиала.
+ * @returns {object} Объект с метриками филиала и сотрудника.
+ */
 function getMetrics(person, branch) {
     var listOfMetrics = getListOfMetrics()
     var branchMetrics = getBranchMetrics(branch, listOfMetrics)
@@ -319,7 +376,7 @@ function getMetrics(person, branch) {
  * @param {object} person - Объект, содержащий данные о сотруднике.
  * @returns {object} Обновленный результирующий объект.
  */
-function setPerson(result, person) {
+function setDataPerson(result, person) {
     var codePerson = String(person.line_tab_num)
     var persDuration = String(person.duration_vacation)
 
@@ -345,14 +402,18 @@ function setPerson(result, person) {
 /**
  * Главная функция
  * @param {object} param - Параметры выполнения функции.
- * @property {string} param.subs - Список подразделений.
+ * @property {string} param.subs - Список подразделений, для подстановки в sql
  */
 function main(param) {
     // получаем данные по сотрудникам
-    var persons = getPersons(param.subs)
-    addLog(tools.object_to_text(persons, 'json'))
+    var metricsOfBranches = getMetricsOfBranches(param.subs)
+    addLog(tools.object_to_text(metricsOfBranches, 'json'))
 }
 
+/**
+ * Возвращает список метрик с их описаниями.
+ * @returns {object}
+ */
 function getListOfMetrics() {
     return {
         "303": {
