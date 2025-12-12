@@ -81,6 +81,11 @@ function getPersonsSql(param) {
     )
 }
 
+/**
+ * Извлекает первый ключ из объекта, игнорируя свойство 'length'.
+ * @param {object} list - Объект, из которого извлекается ключ.
+ * @returns {string|null} Первый найденный ключ или null, если ключи отсутствуют.
+ */
 function getBranchCode(list) {
     var code
     for (code in list) {
@@ -132,32 +137,170 @@ function calcBranch(code, branches) {
     return metrics
 }
 
-function calcOneMetrics(data) {
+/**
+ * Получает значение метрики по подразделению.
+ * Если подразделение не передано, берем первое попавшееся подразделение.
+ *
+ * @param {object} data
+ * @param {string} code - Код подразделения.
+ * @returns {number|null}
+ */
+function getValueFromBranch(data, code) {
+    // получаем код подразделения
+    var branchCode = code
+    if (branchCode == undefined) {
+        branchCode = getBranchCode(data.branches)
+    }
+
     // извлекаем данные
     var personCode = data.personCode
-    var branchCode = getBranchCode(data.branches[personCode])
     var branches = data.metrics.GetOptProperty(personCode, {})
-    var value = branches.GetOptProperty(branchCode)
+    var metrics = branches.GetOptProperty(branchCode)
 
-    return OptInt(value, null)
+    var result = {}
+
+    // проставление данных
+    var metricId
+    for (metricId in metrics) {
+        result[metricId] = OptInt(metrics[metricId], null)
+    }
+
+    return result
 }
 
+/**
+ * Проверяет, превышает ли продолжительность в часах заданное количество дней.
+ * @param {string} code - Код подразделения.
+ * @param {object} branches - Список подразделений.
+ * @param {number} days - Количество дней для сравнения.
+ * @returns {boolean} True, если продолжительность больше или равна; иначе false.
+ */
+function isDurationDays(code, branches, days) {
+    var time = days * 8
+
+    var branch = branches.GetOptProperty(code, {})
+    var duration = branch.GetOptProperty("person_duration", null)
+    var iDuration = OptInt(duration, null)
+    if (iDuration == null) {
+        return false
+    }
+
+    if (iDuration >= time) {
+        return true
+    }
+
+    return false
+}
+
+/**
+ * Разделяет подразделения на две группы по продолжительности.
+ * @param {object} data - Объект, содержащий информацию о подразделениях.
+ * @param {number} days - Количество дней.
+ * @returns {object}
+ */
+function getMinMaxValues(data, days) {
+    var maxBranches = []
+    var minBranches = []
+
+    var branchCode
+    for (branchCode in data.branches) {
+        if (branchCode == "length") {
+            continue
+        }
+
+        if (isDurationDays(branchCode, data.branches, days)) {
+            maxBranches.push(branchCode)
+            continue
+        }
+
+        minBranches.push(branchCode)
+    }
+
+    return {
+        min: minBranches,
+        max: maxBranches,
+    }
+}
+
+// TODO: подсчет среднего значения не протестирован
+// нет таких данных что бы можно было его протестировать
+// делаем запуск всего этого агента за 4 дня - урезаем по максимуму
+function getAverageValue(data, codes) {
+    var count = 0
+    var result = {}
+
+    var code, metricId, metrics, branch, val
+    for (code in codes) {
+        metrics = data.metrics.GetOptProperty(code, null)
+        if (metrics == null) {
+            return null
+        }
+
+        // проставление данных
+        for (metricId in metrics) {
+            if (result.GetOptProperty(metricId) == undefined) {
+                result[metricId] = 0
+            }
+
+            val = OptInt(metrics[metricId], null)
+            if (val == null) {
+                result[metricId] = null
+                continue
+            }
+
+            result[metricId] += val
+        }
+
+        count++
+    }
+
+    for (metricId in result) {
+        if (result.GetOptProperty(metricId) == null) {
+            result[metricId] = null
+            continue
+        }
+
+        result[metricId] = OptInt(result[metricId] / count, null)
+    }
+
+    return result
+}
+
+/**
+ * Выполняет расчет метрик на основе входных данных (по двум подразделениям).
+ * @param {object} data - Входные данные для расчета.
+ * @returns {object|null} Результат расчета или null.
+ */
 function calcTwoMetrics(data) {
+    var DAYS = 7 // кол-во смен
+
     var personCode = data.personCode
+    var minMaxValues = getMinMaxValues(data, DAYS)
 
-    //var value = branches.GetOptProperty(branchCode)
+    // среднее значение между офисами
+    if (ArrayCount(minMaxValues.max) == 2) {
+        return getAverageValue(data, minMaxValues.max)
+    }
 
-    return OptInt(value, null)
+    // если на одном из подразделений менее 7 дней (56 часов)
+    // берем значение по офису, на котором был отработано большее количество дней
+    if (ArrayCount(minMaxValues.max) == 1) {
+        return getValueFromBranch(data, minMaxValues.max[0])
+    }
+
+    return null
 }
 
 function calcMetrics(data) {
     if (data.branches.length == 1) {
-        return calcOneMetrics(data)
+        return getValueFromBranch(data)
     }
 
     if (data.branches.length == 2) {
         return calcTwoMetrics(data)
     }
+
+    return null
 }
 
 /**
@@ -208,6 +351,7 @@ function getMetricsOfBranches(codes) {
     for (person in persons) {
         calculate = setDataPerson(calculate, person)
         metrics = setMetricsPerson(metrics, person, calculate)
+        break
     }
 
     return [calculate, metrics]
@@ -417,6 +561,83 @@ function setDataPerson(result, person) {
     return result
 }
 
+function getPersonId(code) {
+    var query = "SELECT id FROM collaborators WHERE code = " + SqlLiteral(code)
+    var persons = XQuery("sql: " + query)
+    if (ArrayOptFirstElem(persons) == undefined) {
+        return null
+    }
+
+    if (ArrayCount(persons) > 1) {
+        return null
+    }
+
+    return ArrayOptFirstElem(persons).id
+}
+
+function isAdaptation(id, code) {
+    var query = (
+        "SELECT TOP1 id \n" +
+        "FROM career_reserves \n" +
+        "WHERE person_id = SqlLiteral(" + id + ") \n" +
+        "    AND code = SqlLiteral(" + code + ") \n" +
+        "    AND status = 'active'"
+    )
+
+    var adaptations = XQuery("sql: " + query)
+    if (ArrayOptFirstElem(adaptations) == undefined) {
+        return false
+    }
+
+    return true
+}
+
+function createAdaptations(metrics) {
+    var result = []
+
+    var personCode, metric, personId, adaptation
+    for (personCode in metrics) {
+        addLog(" ")
+        addLog(" ")
+        addLog("Сотрудник: " + personCode)
+        personId = getPersonId(personCode)
+        if (personId == null) {
+            //result.push("Сотрудник не найден.")
+            addLog("Сотрудник не найден.")
+            continue
+        }
+        addLog("personId: " + personId)
+
+        metricsOfPerson = metrics.GetOptProperty(personCode, null)
+        if (metricsOfPerson == null) {
+            //result.push("Отсутствует метрика.")
+            addLog("Отсутствует метрика.")
+            continue
+        }
+        addLog("metricsOfPerson: " + tools.object_to_text(metricsOfPerson, 'json'))
+
+        if (isAdaptation(personId, "razum_personal_sp")) {
+            //result.push("Адаптация была назначена ранее.")
+            addLog("Адаптация была назначена ранее.")
+            continue
+        }
+
+        var education = ADAPTATION.createAdaptation(7147583355778132228, {
+        //var education = ADAPTATION.createAdaptation(personId, {
+            defaultProgId: 7231245838301082062,
+            metrics: metricsOfPerson.result,
+            adaptationDuration: 14,
+            limit: 2,
+        })
+
+        //result.push("Адаптация: " + tools.object_to_text(education, 'json'))
+        addLog("Адаптация: " + tools.object_to_text(education, 'json'))
+        return 
+    }
+
+    return result
+}
+
 /**
  * Главная функция
  * @param {object} param - Параметры выполнения функции.
@@ -425,7 +646,10 @@ function setDataPerson(result, person) {
 function main(param) {
     // получаем данные по сотрудникам
     var metricsOfBranches = getMetricsOfBranches(param.subs)
-    addLog(tools.object_to_text(metricsOfBranches, 'json'))
+    addLog("Данные: " + tools.object_to_text(metricsOfBranches, 'json'))
+
+    var result = createAdaptations(metricsOfBranches[1])
+    addLog("Результат: " + tools.object_to_text(result, 'json'))
 }
 
 /**
@@ -446,6 +670,9 @@ function getListOfMetrics() {
 try {
     addLog("begin")
 
+    var path = 'x-local://wt/web/custom_projects/libs/adaptation_lib.js'
+    DropFormsCache('x-local://wt/web/custom_projects/libs/adaptation_lib.js')
+    var ADAPTATION = OpenCodeLib(path)
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
     var SUBDIVISION = {}
     var METRICS_BRANCH = {}
