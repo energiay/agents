@@ -153,8 +153,7 @@ function getValueFromBranch(data, code) {
     }
 
     // извлекаем данные
-    var personCode = data.personCode
-    var branches = data.metrics.GetOptProperty(personCode, {})
+    var branches = data.metrics.GetOptProperty(data.personCode, {})
     var metrics = branches.GetOptProperty(branchCode)
 
     var result = {}
@@ -222,12 +221,66 @@ function getMinMaxValues(data, days) {
     }
 }
 
-// TODO: подсчет среднего значения не протестирован
-// нет таких данных что бы можно было его протестировать
-// делаем запуск всего этого агента за 4 дня - урезаем по максимуму
+/**
+ * Суммирует числовые значения из объекта.
+ * @param {object} sumMetrics - Объект, где будут накапливаться суммы.
+ * @param {object} metrics - Объект, содержащий значения для суммирования.
+ * @returns {object}
+ */
+function getSumFromObjects(sumMetrics, metrics) {
+    var metricId, val
+    for (metricId in metrics) {
+        if (sumMetrics.GetOptProperty(metricId) === undefined) {
+            sumMetrics[metricId] = 0
+        }
+
+        val = OptInt(metrics[metricId], null)
+        if (val === null || sumMetrics[metricId] === null) {
+            sumMetrics[metricId] = null
+            continue
+        }
+
+        sumMetrics[metricId] += val
+    }
+
+    return sumMetrics
+}
+
+/**
+ * Вычисляет среднее значение метрик из объекта.
+ * @param {object} sum - Объект, содержащий суммы метрик.
+ * @param {number} count - Количество элементов для усреднения.
+ * @returns {object|null} Объект со средними значениями метрик, или null.
+ */
+function getAverageFromObject(sum, count) {
+    if (count == 0) {
+        return null
+    }
+
+    var result = {}
+
+    var metricId
+    for (metricId in sum) {
+        if (sum.GetOptProperty(metricId) === null) {
+            result[metricId] = null
+            continue
+        }
+
+        result[metricId] = OptInt(sum[metricId] / count, null)
+    }
+
+    return result
+}
+
+/**
+ * Вычисляет среднее значение метрик на основе предоставленных данных и кодов.
+ * @param {object} data - Объект с данными, содержащий метрики.
+ * @param {object} codes - Объект с кодами для обработки метрик.
+ * @returns {object|null} Объект со средними значениями метрик или null.
+ */
 function getAverageValue(data, codes) {
     var count = 0
-    var result = {}
+    var sumMetrics = {}
 
     var code, metricId, metrics, branch, val
     for (code in codes) {
@@ -236,34 +289,13 @@ function getAverageValue(data, codes) {
             return null
         }
 
-        // проставление данных
-        for (metricId in metrics) {
-            if (result.GetOptProperty(metricId) == undefined) {
-                result[metricId] = 0
-            }
-
-            val = OptInt(metrics[metricId], null)
-            if (val == null) {
-                result[metricId] = null
-                continue
-            }
-
-            result[metricId] += val
-        }
-
-        count++
+        // суммируем
+        sumMetrics = getSumFromObjects(sumMetrics, metrics)
+        count++ // подсчитываем кол-во
     }
 
-    for (metricId in result) {
-        if (result.GetOptProperty(metricId) == null) {
-            result[metricId] = null
-            continue
-        }
-
-        result[metricId] = OptInt(result[metricId] / count, null)
-    }
-
-    return result
+    // вычисляем среднее значение
+    return getAverageFromObject(sumMetrics, count)
 }
 
 /**
@@ -271,10 +303,9 @@ function getAverageValue(data, codes) {
  * @param {object} data - Входные данные для расчета.
  * @returns {object|null} Результат расчета или null.
  */
-function calcTwoMetrics(data) {
+function calcTwoBranches(data) {
     var DAYS = 7 // кол-во смен
 
-    var personCode = data.personCode
     var minMaxValues = getMinMaxValues(data, DAYS)
 
     // среднее значение между офисами
@@ -291,13 +322,23 @@ function calcTwoMetrics(data) {
     return null
 }
 
+function calcManyBranches(data) {
+    var DAYS = 5 // кол-во смен
+
+    var minMaxValues = getMinMaxValues(data, DAYS)
+}
+
 function calcMetrics(data) {
     if (data.branches.length == 1) {
         return getValueFromBranch(data)
     }
 
     if (data.branches.length == 2) {
-        return calcTwoMetrics(data)
+        return calcTwoBranches(data)
+    }
+
+    if (data.branches.length > 2) {
+        return calcManyBranches(data)
     }
 
     return null
