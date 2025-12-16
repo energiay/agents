@@ -274,24 +274,27 @@ function getAverageFromObject(sum, count) {
 }
 
 /**
- * Вычисляет среднее значение метрик на основе предоставленных данных и кодов.
- * @param {object} data - Объект с данными, содержащий метрики.
- * @param {object} codes - Объект с кодами для обработки метрик.
+ * Вычисляет среднее значение метрик для набора кодов.
+ * @param {object} data - Объект с данными пользователя и его метриками.
+ * @param {array} codes - Список из кодов подразделений.
  * @returns {object|null} Объект со средними значениями метрик или null.
  */
 function getAverageValue(data, codes) {
+    var personCode = data.GetOptProperty("personCode")
+    var metrics = data.metrics.GetOptProperty(personCode, {})
+
     var count = 0
     var sumMetrics = {}
 
-    var code, metricId, metrics, branch, val
+    var code, branchMetrics
     for (code in codes) {
-        metrics = data.metrics.GetOptProperty(code, null)
+        branchMetrics = metrics.GetOptProperty(code, null)
         if (metrics == null) {
             return null
         }
 
         // суммируем
-        sumMetrics = getSumFromObjects(sumMetrics, metrics)
+        sumMetrics = getSumFromObjects(sumMetrics, branchMetrics)
         count++ // подсчитываем кол-во
     }
 
@@ -404,7 +407,6 @@ function calcTwoBranches(data) {
     }
 
     return null
-
 }
 
 //function calcThreeBranches(data) {
@@ -765,8 +767,8 @@ function main(param) {
     var metricsOfBranches = getMetricsOfBranches(param.subs)
     addLog("Данные: " + tools.object_to_text(metricsOfBranches, 'json'))
 
-    var result = createAdaptations(metricsOfBranches[1])
-    addLog("Результат: " + tools.object_to_text(result, 'json'))
+    //var result = createAdaptations(metricsOfBranches[1])
+    //addLog("Результат: " + tools.object_to_text(result, 'json'))
 }
 
 /**
@@ -832,6 +834,7 @@ function getListOfMetrics() {
             name: "Gross sim",
             sql: getSqlGrossSim("%сим-карта%", begin, end),
         },
+        /*
         "303": {
             code: "product_revenue",
             name: "Товарная выручка",
@@ -842,6 +845,7 @@ function getListOfMetrics() {
             name: "Финансовая выручка",
             sql: getSqlRevenue("%финанс%", begin, end),
         },
+        */
     }
 }
 
