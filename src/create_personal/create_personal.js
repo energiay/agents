@@ -722,6 +722,7 @@ function createAdaptations(metrics) {
         addLog("Сотрудник: " + personCode)
         personId = getPersonId(personCode)
         //personId = 7147583355778132228
+        //personId = 6188032376454057749
         if (personId == null) {
             //result.push("Сотрудник не найден.")
             addLog("Сотрудник не найден.")
@@ -743,10 +744,10 @@ function createAdaptations(metrics) {
             continue
         }
 
-        var education = ADAPTATION.createAdaptation(personId, {
+        education = ADAPTATION.createAdaptation(personId, {
             defaultProgId: 7231245838301082062,
             metrics: metricsOfPerson.result,
-            adaptationDuration: 4,
+            adaptationDuration: 7,
             limit: 2,
         })
 
@@ -767,8 +768,8 @@ function main(param) {
     var metricsOfBranches = getMetricsOfBranches(param.subs)
     addLog("Данные: " + tools.object_to_text(metricsOfBranches, 'json'))
 
-    //var result = createAdaptations(metricsOfBranches[1])
-    //addLog("Результат: " + tools.object_to_text(result, 'json'))
+    var result = createAdaptations(metricsOfBranches[1])
+    addLog("Результат: " + tools.object_to_text(result, 'json'))
 }
 
 /**
@@ -789,6 +790,7 @@ function getSqlRevenue(find, begin, end) {
         "where 1=1 \n" +
         "    and mot.metric_name ilike '" + find + "' \n" +
         "    and sa.qty_up > 0 -- qty_up <> 0 -- с учетом возвратов \n" +
+        "    and and sa.ym = 2511 \n" +
         "    and sa.user_tab_no = '{person}' \n" +
         "    and sa.branchcode = '{branch}' \n" +
         "    and sa.operation_date::date between " +
@@ -811,6 +813,7 @@ function getSqlGrossSim(find, begin, end) {
         "where 1=1 \n" +
         "    and sa.up_category ilike '" + find + "' \n" +
         "    and sa.qty_up > 0 -- qty_up <> 0 -- с учетом возвратов \n" +
+        "    and and sa.ym = 2511 \n" +
         "    and sa.user_tab_no = '{person}' \n" +
         "    and sa.branchcode = '{branch}' \n" +
         "    and sa.operation_date::date between " +
@@ -834,7 +837,6 @@ function getListOfMetrics() {
             name: "Gross sim",
             sql: getSqlGrossSim("%сим-карта%", begin, end),
         },
-        /*
         "303": {
             code: "product_revenue",
             name: "Товарная выручка",
@@ -845,7 +847,6 @@ function getListOfMetrics() {
             name: "Финансовая выручка",
             sql: getSqlRevenue("%финанс%", begin, end),
         },
-        */
     }
 }
 
@@ -878,7 +879,6 @@ try {
     addLog("begin")
 
     var path = 'x-local://wt/web/custom_projects/libs/adaptation_lib.js'
-    DropFormsCache('x-local://wt/web/custom_projects/libs/adaptation_lib.js')
     var ADAPTATION = OpenCodeLib(path)
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
     var SUBDIVISION = {}
