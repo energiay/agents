@@ -15,16 +15,19 @@ function addLog(value, name) {
 
 /**
  * Генерирует SQL-запрос для получения статистики по рабочим часам.
- * @param {object} param - Объект, содержащий параметры для формирования запроса.
+ * @param {object} params - Объект, содержащий параметры для формирования запроса.
  * @returns {string} Сформированный SQL-запрос.
  */
-function getPersonsSql(param) {
+function getPersonsSql(params) {
     var tabNum = ",a.line_tab_num"
-    if (param.GetOptProperty("type") == "subdivision") {
+    if (params.GetOptProperty("type") == "subdivision") {
         tabNum = ""
     }
 
-    var codes = param.GetOptProperty("codes")
+    var begin = params.begin
+    var end = params.end + " 23:59:59"
+
+    var codes = params.GetOptProperty("codes")
     var position = 'Специалист'
 
     return (
@@ -56,9 +59,10 @@ function getPersonsSql(param) {
                             "p.PERSON_NUMBER = o.assigment_number " +
                             "AND e.oper_date = o.oper_date \n" +
         "   where 1=1  \n" +
-        "   and e.oper_date >= '2025-11-01' AND e.oper_date <= '2025-11-30' \n" +
+        "   AND e.oper_date >= '" + begin + "' \n" +
+        "   AND e.oper_date <= '" + end + "' \n" +
         "   AND o.usage_mnemonic IN ('Я','ЯОО','ЯВ') \n" +
-        "   and s.CODE_POINTS_SALE in (" + codes + " ) \n" +
+        "   AND s.CODE_POINTS_SALE in (" + codes + " ) \n" +
         "   --and p.person_number in ('273332') \n" +
         "   GROUP BY \n" +
         "       s.CODE_POINTS_SALE \n" +
@@ -478,39 +482,25 @@ function setMetricsPerson(metrics, person, calculate) {
 
 /**
  * Вычисляет метрики для заданных кодов.
- * @param {string} codes - коды подразделений, для подстановки в sql
- * @returns {Array<object>}
+ * @param {object} params - Параметры выполнения функции.
+ * @returns {array}
  */
-function getMetricsOfBranches(codes) {
+function getMetricsOfBranches(params) {
     var calculate = {}
     var metrics = {}
 
-    addLog("persons begin")
-    var query = getPersonsSql({codes: codes})
+    addLog("Получение списка сотрудников")
+    var query = getPersonsSql(params)
     var persons = SQL_LIB.optXExec(query, 'corecpu')
-    addLog("persons end")
 
+    addLog("Подсчет результатов по сотрудникам")
     var person, code
     for (person in persons) {
-        calculate = setDataPerson(calculate, person)
+        calculate = setDataPerson(calculate, person, params)
         metrics = setMetricsPerson(metrics, person, calculate)
     }
 
     return [calculate, metrics]
-}
-
-/**
- * Получает продолжительность работы указанного подразделения.
- * @param {string} code - Код подразделения.
- * @returns {number | null} Продолжительность для указанного подразделения.
- */
-function getSubDuration(code) {
-    var result = SUBS_DURATION.GetOptProperty(code)
-    if (result != undefined) {
-        return result.duration_vacation
-    }
-
-    return null
 }
 
 /**
@@ -530,38 +520,16 @@ function getMetricsFromList(list) {
 }
 
 /**
- * Получает факт сотрудника по филиалу
- * @param {string} person - Табельный номер сотрудника.
- * @param {string} branch - Код филиала.
- * @param {string} sql - Строка запроса для получения данных
- * @returns {number|null} Значение метрики или null, если не найдено.
- */
-function getPersonMetric(values, person, branch) {
-    return values[person + "_" + branch]
-    /*
-    sql = StrReplace(sql, "{person}", person)
-    sql = StrReplace(sql, "{branch}", branch)
-
-    var metric = ArrayOptFirstElem(SQL_LIB.optXExec(sql, 'corecpu'))
-    if (metric == undefined) {
-        return 0
-    }
-
-    return OptInt(metric.fct, 0)
-    */
-}
-
-/**
  * Формирует SQL-запрос для получения метрик по филиалу.
- * @param {string} branch - Код филиала.
- * @param {object} LIST - Список метрик.
+ * @param {object} params
  * @returns {string} SQL-запрос в виде строки.
  */
-function getSqlMetricBranch(branch, LIST) {
-    var sMetrics = getMetricsFromList(LIST)
+function getSqlMetricBranch(params) {
+    var sMetrics = getMetricsFromList(params.list)
 
-    var begin = "2025-11-01"
-    var end = "2025-11-30 23:59:59"
+    var begin = params.begin
+    var end = params.end + " 23:59:59"
+
     return (
         "\n" +
         "select distinct \n" +
@@ -581,8 +549,7 @@ function getSqlMetricBranch(branch, LIST) {
         "and period_code  = 'm' \n" +
         "and m.report_dt between date '" + begin + "' and date '" + end + "' \n" +
         "and m.metric_type_id in (1) \n" +
-        "and dd.department_short_name is not null \n" +
-        "--and dd.department_short_name = '" + branch + "'"
+        "and dd.department_short_name is not null"
     )
 }
 
@@ -628,71 +595,43 @@ function optObj(value) {
 }
 
 /**
- * Получает метрики для подразделения из кеша или базы данных.
- * @param {string} branch - Идентификатор ветки.
- * @returns {object} Объект с метриками ветки.
-function getBranchMetrics(branch) {
-    if (METRICS_BRANCH.GetOptProperty(branch) != undefined) {
-        return createObject(METRICS_BRANCH.GetOptProperty(branch))
-    }
-
-    if (optObj(METRICS_BRANCH) != null) {
-        return null
-    }
-
-    var query = getSqlMetricBranch(branch, LIST_OF_METRICS)
-    var metrics = SQL_LIB.optXExec(query, 'corecpu')
-
-    var metric, metricCode, branchCode
-    for (metric in metrics) {
-        branchCode = String(metric.branch_code)
-        METRICS_BRANCH[branchCode] = {}
-
-        metricCode = LIST_OF_METRICS[String(metric.id)].code
-        METRICS_BRANCH[branchCode][metricCode] = {
-            branch: OptInt(metric.value, null),
-        }
-    }
-
-    return createObject(METRICS_BRANCH.GetOptProperty(branch, null))
-}
- */
-
-/**
- * Получает метрики для указанного сотрудника и филиала.
+ * Получает факт сотрудника в филиале (по метрикам).
  * @param {string} person - Идентификатор сотрудника.
  * @param {string} branch - Идентификатор филиала.
+ * @param {object} params - Параметры выполнения функции.
  * @returns {object} Объект с метриками филиала и сотрудника.
  */
-function getMetrics(person, branch) {
-    //var branchMetrics = getBranchMetrics(branch)
-    var branchMetrics = createObject(METRICS_FILIAL.GetOptProperty(branch, {}))
+function getPersonFact(person, branch, params) {
+    var branchMetrics = params.filial_metrics.GetOptProperty(branch, {})
 
-    var metricCode, values, value
-    for (metricCode in branchMetrics) {
+    // клонируем объект
+    var result = createObject(branchMetrics)
 
-        values = getMetricFromCode(metricCode).GetOptProperty("values")
+    var metricCode, values, value, metric
+    for (metricCode in result) {
+        metric = params.list_of_metrics_code.GetOptProperty(metricCode, {})
+        values = metric.GetOptProperty("values", {})
         value = values.GetOptProperty(person + "_" + branch, {})
-        branchMetrics[metricCode]["person"] = value.GetOptProperty("fct", 0)
-        //getPersonMetric(val, person, branch)
+        result[metricCode]["person"] = value.GetOptProperty("fct", 0)
     }
 
-    return branchMetrics
+    return result
 }
 
 /**
  * Устанавливает данные о сотруднике в результирующий объект.
  * @param {object} result - Результирующий объект для добавления данных.
  * @param {object} person - Объект, содержащий данные о сотруднике.
+ * @param {object} params - Параметры выполнения функции.
  * @returns {object} Обновленный результирующий объект.
  */
-function setDataPerson(result, person) {
+function setDataPerson(result, person, params) {
     var codePerson = String(person.line_tab_num)
     var persDuration = String(person.duration_vacation)
 
     var codeSubdiv = String(person.office_amdocs_code)
-    var subDuration = getSubDuration(codeSubdiv)
-    var subMetrics = getMetrics(codePerson, codeSubdiv)
+    var subDuration = params.filial_duration.GetOptProperty(codeSubdiv, null)
+    var personFact = getPersonFact(codePerson, codeSubdiv, params)
 
     var checkPersson = result.GetOptProperty(codePerson)
     if (checkPersson == undefined) {
@@ -702,8 +641,8 @@ function setDataPerson(result, person) {
     result[codePerson].length = result[codePerson].length + 1,
     result[codePerson][codeSubdiv] = {
         person_duration: OptInt(persDuration, null),
-        branch_duration: OptInt(subDuration, null),
-        metrics: subMetrics,
+        branch_duration: OptInt(subDuration.duration_vacation, null),
+        metrics: personFact,
     }
 
     return result
@@ -793,14 +732,15 @@ function createAdaptations(metrics) {
 
 /**
  * Главная функция
- * @param {object} param - Параметры выполнения функции.
+ * @param {object} params - Параметры выполнения функции.
  * @property {string} param.subs - Список подразделений, для подстановки в sql
  */
-function main(param) {
-    // получаем данные по сотрудникам
-    var metricsOfBranches = getMetricsOfBranches(param.subs)
-    addLog("Данные: " + tools.object_to_text(metricsOfBranches, 'json'))
+function main(params) {
+    // Подсчет результатов
+    var metricsOfBranches = getMetricsOfBranches(params)
+    addLog("Результаты: " + tools.object_to_text(metricsOfBranches, 'json'))
 
+    //addLog("Создание треков обучения.")
     //var result = createAdaptations(metricsOfBranches[1])
     //addLog("Результат: " + tools.object_to_text(result, 'json'))
 }
@@ -844,12 +784,10 @@ function getRevenue(find, ym) {
 
 /**
  * Возвращает список метрик с их описаниями.
+ * @param {string} ym - период извлечения данных (год и месяц)
  * @returns {object}
  */
-function getListOfMetrics() {
-    // TODO: ym
-    var ym = "2511"
-
+function getListOfMetrics(ym) {
     return {
         "73": {
             code: "gross_sim",
@@ -874,7 +812,7 @@ function getListOfMetrics() {
  * @param {object} list
  * @returns {object}
  */
-function getMetrics(list) {
+function getMetricsFromCode(list) {
     var result = {}
 
     var id, code
@@ -890,12 +828,13 @@ function getMetrics(list) {
 
 /**
  * Получает метрики по всем филиалам.
+ * @param {object} params
  * @returns {object} Объект с метриками филиалов.
  */
-function getBranchesMetrics() {
+function getBranchesMetrics(params) {
     var result = {}
 
-    var query = getSqlMetricBranch(null, LIST_OF_METRICS)
+    var query = getSqlMetricBranch(params)
     var metrics = SQL_LIB.optXExec(query, 'corecpu')
 
     var metric, metricCode, branchCode
@@ -905,7 +844,7 @@ function getBranchesMetrics() {
             result[branchCode] = {}
         }
 
-        metricCode = LIST_OF_METRICS[String(metric.id)].code
+        metricCode = params.list[String(metric.id)].code
         result[branchCode][metricCode] = {
             branch: OptInt(metric.value, null),
         }
@@ -914,9 +853,13 @@ function getBranchesMetrics() {
     return result
 }
 
-function getSubsDuration(codes) {
-    var result = {}
-    var query = getPersonsSql({codes: codes, type: "subdivision"})
+/**
+ * Возвращает продолжительность работы подразделений.
+ * @param {object} params
+ * @returns {object}
+ */
+function getSubsDuration(params) {
+    var query = getPersonsSql(params)
     var settings = {field: "office_amdocs_code"}
 
     return SQL_LIB.optXExec(query, 'corecpu', settings)
@@ -931,31 +874,47 @@ try {
     var ADAPTATION = OpenCodeLib(path)
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
 
+    // TODO: ym (период)
+    var ym = "2511"
+    //
+    // TODO: период
+    var begin = "2025-11-01"
+    var end = "2025-11-30"
 
-    addLog("LIST_OF_METRICS begin")
-    var LIST_OF_METRICS = getListOfMetrics() // список метрик по id
-    addLog("LIST_OF_METRICS end")
-    addLog(" ")
 
-    var METRICS = getMetrics(LIST_OF_METRICS) // список метрикам по коду
+    addLog("Получение параметров")
 
-    addLog("METRICS_FILIAL begin")
-    var METRICS_FILIAL = getBranchesMetrics() // метрики по филиалам за период
-    addLog("METRICS_FILIAL end")
-    addLog(" ")
+    // список метрик
+    var LIST_OF_METRICS = getListOfMetrics(ym) // по id
+    var LIST_OF_METRICS_CODE = getMetricsFromCode(LIST_OF_METRICS) // по коду
 
-    addLog("SUBS_DURATION begin")
-    var SUBS_DURATION = getSubsDuration(Param.subs) // время работы офиса
-    //addLog(tools.object_to_text(SUBS_DURATION, 'json'))
-    addLog("SUBS_DURATION end")
-    addLog(" ")
+    // метрики по филиалам за период
+    var METRICS_FILIAL = getBranchesMetrics({
+        list: LIST_OF_METRICS,
+        begin: begin,
+        end: end,
+    })
+
+    // время работы офиса
+    var SUBS_DURATION = getSubsDuration({
+        codes: Param.subs,
+        begin: begin,
+        end: end,
+        type: "subdivision",
+    })
+
 
     var params = {
-        codes: Params.codes,
+        codes: Param.subs,
+        begin: begin,
+        end: end,
         list_of_metrics: LIST_OF_METRICS,
+        list_of_metrics_code: LIST_OF_METRICS_CODE,
+        filial_metrics: METRICS_FILIAL,
+        filial_duration: SUBS_DURATION,
     }
 
-    main(Param)
+    main(params)
 
     addLog("end")
 }
