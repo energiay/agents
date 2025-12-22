@@ -27,8 +27,13 @@ function getPersonsSql(params) {
     var begin = params.begin
     var end = params.end + " 23:59:59"
 
-    var codes = params.GetOptProperty("codes")
     var position = 'Специалист'
+
+    var whereCodes = ""
+    var codes = params.GetOptProperty("codes", "")
+    if (codes != "") {
+        whereCodes = "AND s.CODE_POINTS_SALE in (" + codes + " )"
+    }
 
     return (
         "\n" +
@@ -61,8 +66,8 @@ function getPersonsSql(params) {
         "   where 1=1  \n" +
         "   AND e.oper_date >= '" + begin + "' \n" +
         "   AND e.oper_date <= '" + end + "' \n" +
-        "   AND o.usage_mnemonic IN ('Я','ЯОО','ЯВ') \n" +
-        "   AND s.CODE_POINTS_SALE in (" + codes + " ) \n" +
+        "   AND o.usage_mnemonic IN ('Я','ЯОО','ЯВ') " +
+        "   " + whereCodes + " \n" +
         "   --and p.person_number in ('273332') \n" +
         "   GROUP BY \n" +
         "       s.CODE_POINTS_SALE \n" +
@@ -81,8 +86,7 @@ function getPersonsSql(params) {
         "a.office_amdocs_code " +
         "" + tabNum + " \n" +
         ",a.employee_unit --роль 1с \n" +
-        ",a.exp_date \n" +
-        "--LIMIT 4000"
+        ",a.exp_date"
     )
 }
 
@@ -145,7 +149,7 @@ function calcBranch(code, branches) {
 
 /**
  * Получает значение метрики по подразделению.
- * Если подразделение не передано, берем первое попавшееся подразделение.
+ * Если код подразделения не передан, берем первое попавшееся подразделение.
  *
  * @param {object} data
  * @param {string} code - Код подразделения.
@@ -203,21 +207,21 @@ function isDurationDays(code, branches, days) {
 
 /**
  * Разделяет подразделения на две группы по продолжительности.
- * @param {object} data - Объект, содержащий информацию о подразделениях.
+ * @param {object} branches - Подразделения.
  * @param {number} days - Количество дней.
  * @returns {object}
  */
-function getMinMaxValues(data, days) {
+function getMinMaxValues(branches, days) {
     var maxBranches = []
     var minBranches = []
 
     var branchCode
-    for (branchCode in data.branches) {
+    for (branchCode in branches) {
         if (branchCode == "length") {
             continue
         }
 
-        if (isDurationDays(branchCode, data.branches, days)) {
+        if (isDurationDays(branchCode, branches, days)) {
             maxBranches.push(branchCode)
             continue
         }
@@ -323,7 +327,6 @@ function getAverageValue(data, codes) {
  * Преобразует объект в массив объектов с кодом и продолжительностью.
  * @param {object} list - Объект для преобразования.
  * @returns {Array}
- */
 function objectToArray(list) {
     var result = []
 
@@ -338,12 +341,12 @@ function objectToArray(list) {
 
     return result
 }
+ */
 
 /**
  * Определяет подразделение для подсчета (из двух).
- * @param {object} list - Объект, содержащий как минимум две ветки.
+ * @param {object} list - Объект, содержащий как минимум два подразделения.
  * @returns {string|string[]} Код ветки или массив кодов при равенстве.
- */
 function getMaxBranch(list) {
     var arr = objectToArray(list) // тут цикл
     if (arr[0].person_duration == arr[1].person_duration) {
@@ -355,6 +358,47 @@ function getMaxBranch(list) {
     }
 
     return arr[1].code
+}
+ */
+
+/**
+ * Определяет подразделение(я) с максимальной продолжительностью.
+ * @param {object} list - Объект с любым количеством подразделений.
+ * @returns {string|string[]|null} Код, массив кодов или null, если список пуст.
+ */
+function getMaxBranch(list) {
+    var maxDuration = -1
+    var winners = []
+
+    // поиск максимальных значений
+    var code, current
+    for (code in list) {
+        if (code == 'length') {
+            continue
+        }
+
+        current = {code: code, duration: list[code].person_duration}
+
+        // Нашли новый максимум
+        if (current.duration > maxDuration) {
+            // сбрасываем список победителей и записываем нового
+            maxDuration = current.duration
+            winners = [current.code]
+            continue
+        }
+
+        // Если значение равно текущему максимуму - добавляем в список
+        if (current.duration == maxDuration) {
+            winners.push(current.code)
+        }
+    }
+
+    if (ArrayCount(winners) == 0) {
+        return null
+    }
+
+    // Если победитель один — возвращаем строку, если несколько — массив
+    return (ArrayCount(winners) === 1 ? winners[0] : winners)
 }
 
 /**
@@ -402,7 +446,7 @@ function calcTwoBranches(data) {
     var DAYS = 7 // кол-во смен
 
     // Делим подразделения на: больше DAYS смен и меньше DAYS смен
-    var minMaxValues = getMinMaxValues(data, DAYS)
+    var minMaxValues = getMinMaxValues(data.branches, DAYS)
 
     // среднее значение между офисами
     if (ArrayCount(minMaxValues.max) == 2) {
@@ -412,10 +456,10 @@ function calcTwoBranches(data) {
     // получаем код подразделения
     var branch = getMaxBranch(data.branches)
 
-    // если на одном из подразделений менее 7 дней (56 часов)
+    // если хотя бы на одном из подразделений менее 7 смен:
     // берем значение по офису, на котором было отработано большее количество дней
     if (DataType(branch) == 'string') {
-        return getValueFromBranch(data, branchCode)
+        return getValueFromBranch(data, branch)
     }
 
     // находим среднее значение
@@ -426,11 +470,34 @@ function calcTwoBranches(data) {
     return null
 }
 
-//function calcThreeBranches(data) {
-//    var DAYS = 5 // кол-во смен
-//
-//    var minMaxValues = getMinMaxValues(data, DAYS)
-//}
+function calcThreeBranches(data) {
+    var DAYS = 5 // кол-во смен
+
+    // Делим подразделения на: больше DAYS смен и меньше DAYS смен
+    var minMaxValues = getMinMaxValues(data.branches, DAYS)
+
+    // Если у всех трех подразделений DAYS и более смен
+    if (ArrayCount(minMaxValues.max) == 3) {
+        // среднее значение между офисами
+        return getAverageValue(data, minMaxValues.max)
+    }
+
+    // получаем код(ы) подразделения(ий) для подсчета результата
+    var branch = getMaxBranch(data.branches)
+
+    // если хотя бы на одном из подразделений менее 5 смен:
+    // берем значение по офису, на котором было отработано большее количество дней
+    if (DataType(branch) == 'string') {
+        return getValueFromBranch(data, branch)
+    }
+
+    // находим среднее значение
+    if (isArray(branch)) {
+        return getAverageValue(data, branch)
+    }
+
+    return null
+}
 
 function calcMetrics(data) {
     if (data.branches.length == 1) {
@@ -441,9 +508,20 @@ function calcMetrics(data) {
         return calcTwoBranches(data)
     }
 
-    //if (data.branches.length == 3) {
-    //    return calcThreeBranches(data)
-    //}
+    if (data.branches.length == 3) {
+        return calcThreeBranches(data)
+    }
+
+    var branch = getMaxBranch(data.branches)
+
+    if (DataType(branch) == 'string') {
+        return getValueFromBranch(data, branch)
+    }
+
+    // находим среднее значение
+    if (isArray(branch)) {
+        return getAverageValue(data, branch)
+    }
 
     return null
 }
