@@ -865,6 +865,25 @@ function getSubsDuration(params) {
     return SQL_LIB.optXExec(query, 'corecpu', settings)
 }
 
+/**
+ * Получает год и месяц в формате 'ГГММ' из переданной даты.
+ * @param {Date|string} date - Исходная дата для обработки.
+ * @returns {string} Строка, содержащая год и месяц в формате 'ГГММ'.
+ */
+function getYearMonth(date) {
+    var dDate = Date(date)
+
+    var sMonth = ""
+    var month = Month(dDate)
+    if (month < 10) {
+        sMonth = "0" + month
+    } else {
+        sMonth = month + ""
+    }
+
+    return StrCharRangePos(String(Year(dDate)), 2, 4) + sMonth
+}
+
 // entry point
 // назначение/доназначение модульной программы
 try {
@@ -874,13 +893,10 @@ try {
     var ADAPTATION = OpenCodeLib(path)
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
 
-    // TODO: ym (период)
-    var ym = "2511"
-    //
     // TODO: период
     var begin = "2025-11-01"
     var end = "2025-11-30"
-
+    var ym = getYearMonth(begin)
 
     addLog("Получение параметров")
 
