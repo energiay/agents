@@ -535,7 +535,7 @@ function calcMetrics(data) {
  */
 function setMetricsPerson(metrics, person, calculate) {
     var personCode = String(person.line_tab_num)
-    if (metrics.GetOptProperty(code) == undefined) {
+    if (metrics.GetOptProperty(personCode) == undefined) {
         metrics[personCode] = {}
     }
 
@@ -716,7 +716,7 @@ function setDataPerson(result, person, params) {
         result[codePerson] = {length: 0}
     }
 
-    result[codePerson].length = result[codePerson].length + 1,
+    result[codePerson].length = result[codePerson].length + 1
     result[codePerson][codeSubdiv] = {
         person_duration: OptInt(persDuration, null),
         branch_duration: OptInt(subDuration.duration_vacation, null),
@@ -970,6 +970,92 @@ try {
     var path = 'x-local://wt/web/custom_projects/libs/adaptation_lib.js'
     var ADAPTATION = OpenCodeLib(path)
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
+
+
+    //var calculate = {
+    //    "444384": {
+    //        "length": 4,
+    //        "7M30000": {
+    //            "person_duration": 96,
+    //            "branch_duration": 376,
+    //            "metrics": {
+    //                "gross_sim": {
+    //                    "branch": 120,
+    //                    "person": 43
+    //                },
+    //                "product_revenue": {
+    //                    "branch": 625531,
+    //                    "person": 195127
+    //                },
+    //                "finance_revenue": {
+    //                    "branch": 55056,
+    //                    "person": 22608.3
+    //                }
+    //            }
+    //        },
+    //        "VM62000": {
+    //            "person_duration": 118,
+    //            "branch_duration": 232,
+    //            "metrics": {
+    //                "gross_sim": {
+    //                    "branch": 241,
+    //                    "person": 3
+    //                },
+    //                "finance_revenue": {
+    //                    "branch": 110301,
+    //                    "person": 4089
+    //                },
+    //                "product_revenue": {
+    //                    "branch": 965089,
+    //                    "person": 25207
+    //                }
+    //            }
+    //        },
+    //        "VM62001": {
+    //            "person_duration": 118,
+    //            "branch_duration": 232,
+    //            "metrics": {
+    //                "gross_sim": {
+    //                    "branch": 241,
+    //                    "person": 3
+    //                },
+    //                "finance_revenue": {
+    //                    "branch": 110301,
+    //                    "person": 4089
+    //                },
+    //                "product_revenue": {
+    //                    "branch": 965089,
+    //                    "person": 25207
+    //                }
+    //            }
+    //        },
+    //        "VO27000": {
+    //            "person_duration": 8,
+    //            "branch_duration": 408,
+    //            "metrics": {
+    //                "product_revenue": {
+    //                    "branch": 2171194,
+    //                    "person": 25298
+    //                },
+    //                "finance_revenue": {
+    //                    "branch": 203219,
+    //                    "person": 0
+    //                },
+    //                "gross_sim": {
+    //                    "branch": 297,
+    //                    "person": 5
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
+
+    //var metrics = {}
+    //metrics = setMetricsPerson(metrics, {line_tab_num:"444384"}, calculate)
+    //addLog(tools.object_to_text(metrics, 'json'))
+
+    //return
+
 
     // TODO: период
     var begin = "2025-11-01"
