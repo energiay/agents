@@ -727,13 +727,21 @@ function setDataPerson(result, person, params) {
 }
 
 function getPersonId(code) {
-    var query = "SELECT id FROM collaborators WHERE code = " + SqlLiteral(code)
+    var query = (
+        "\n" +
+        "SELECT id \n" +
+        "FROM collaborators \n" +
+        "WHERE is_dismiss = 0 \n" +
+        "    AND code = " + SqlLiteral(code)
+    )
     var persons = XQuery("sql: " + query)
     if (ArrayOptFirstElem(persons) == undefined) {
+        addLog(query)
         return null
     }
 
     if (ArrayCount(persons) > 1) {
+        addLog(query)
         return null
     }
 
@@ -769,41 +777,41 @@ function createAdaptations(metrics) {
     for (personCode in metrics) {
         addLog(" ")
         addLog(" ")
-        addLog("Сотрудник: " + personCode)
         personId = getPersonId(personCode)
+        addLog("Сотрудник: " + personCode)
         //personId = 7147583355778132228
         //personId = 6188032376454057749
         if (personId == null) {
-            //result.push("Сотрудник не найден.")
-            addLog("Сотрудник не найден.")
+            addLog("Сотрудник не найден, уволен или их найдено несколько.")
             continue
         }
         addLog("personId: " + personId)
 
         metricsOfPerson = metrics.GetOptProperty(personCode, null)
         if (metricsOfPerson == null) {
-            //result.push("Отсутствует метрика.")
             addLog("Отсутствует метрика.")
             continue
         }
         addLog("metricsOfPerson: " + tools.object_to_text(metricsOfPerson, 'json'))
 
         if (isAdaptation(personId, "razum_personal_sp")) {
-            //result.push("Адаптация была назначена ранее.")
             addLog("Адаптация была назначена ранее.")
             continue
         }
 
-        education = ADAPTATION.createAdaptation(personId, {
-            defaultProgId: 7231245838301082062,
-            metrics: metricsOfPerson.result,
-            adaptationDuration: 7,
-            limit: 2,
-        })
+        //education = ADAPTATION.createAdaptation(personId, {
+        //    defaultProgId: 7231245838301082062,
+        //    metrics: metricsOfPerson.result,
+        //    adaptationDuration: 7,
+        //    limit: 2,
+        //})
 
-        result.push(education)
-        addLog("Адаптация: " + tools.object_to_text(education, 'json'))
+        //result.push(education)
+        //addLog("Адаптация: " + tools.object_to_text(education, 'json'))
     }
+
+    addLog(" ")
+    addLog(" ")
 
     return result
 }
@@ -818,9 +826,9 @@ function main(params) {
     var metricsOfBranches = getMetricsOfBranches(params)
     addLog("Результаты: " + tools.object_to_text(metricsOfBranches, 'json'))
 
-    //addLog("Создание треков обучения.")
-    //var result = createAdaptations(metricsOfBranches[1])
-    //addLog("Результат: " + tools.object_to_text(result, 'json'))
+    addLog("Создание треков обучения.")
+    var result = createAdaptations(metricsOfBranches[1])
+    addLog("Результат: " + tools.object_to_text(result, 'json'))
 }
 
 function getGrossSim(find, ym) {
