@@ -831,6 +831,12 @@ function main(params) {
     addLog("Результат: " + tools.object_to_text(result, 'json'))
 }
 
+/**
+ * Получает агрегированные данные о продажах по категории и месяцам.
+ * @param {string} find - Категория для поиска.
+ * @param {number} ym - Год и месяц для фильтрации данных (например, 2512).
+ * @returns {object} Результат выполнения SQL-запроса.
+ */
 function getGrossSim(find, ym) {
     var query = (
         "select \n" +
@@ -848,6 +854,12 @@ function getGrossSim(find, ym) {
     return  SQL_LIB.optXExec(query, 'corecpu', {field: "id"})
 }
 
+/**
+ * Получает данные о выручке на основе заданных параметров.
+ * @param {string} find - Критерий поиска для метрики.
+ * @param {number} ym - Год и месяц для фильтрации данных (например, 2512).
+ * @returns {object} Результат выполнения SQL-запроса с данными о выручке.
+ */
 function getRevenue(find, ym) {
     var query = (
         "select \n" +
