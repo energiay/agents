@@ -26,10 +26,10 @@ function getAdaptations() {
         WHERE cr.code = 'mb_new_employees_adaptation_ssp'
         AND cr.status = 'active'
         AND cs.is_dismiss = 0
-        AND cr.id in (
-            7264842427154538051
-            ,7264562922959768513
-        )
+        --AND cr.id in (
+        --    7264842427154538051
+        --    ,7264562922959768513
+        --)
         ORDER BY cr.start_date desc
     "
 
@@ -81,7 +81,7 @@ function addEducationMethod(card, params, defTask) {
  * @returns {object|undefined} Найденный объект активности или undefined.
  */
 function getActivity(tasks, id) {
-    var sWhere = "StrContains(String(This.id), '" + id + "', true)"
+    var sWhere = "StrBegins(String(This.id), '" + id + "', true)"
 
     return ArrayOptFind(tasks, sWhere)
 }
@@ -94,7 +94,7 @@ function getActivity(tasks, id) {
  */
 function getParentStage(tasks, id) {
     var sWhere = "This.parent_task_id == '' && This.type == 'stage' "
-    sWhere += "&& StrContains(String(This.id), '" + id + "', true)"
+    sWhere += "&& StrBegins(String(This.id), '" + id + "', true)"
 
     return ArrayOptFind(tasks, sWhere)
 }
