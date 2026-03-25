@@ -324,44 +324,6 @@ function getAverageValue(data, codes) {
 }
 
 /**
- * Преобразует объект в массив объектов с кодом и продолжительностью.
- * @param {object} list - Объект для преобразования.
- * @returns {Array}
-function objectToArray(list) {
-    var result = []
-
-    var code
-    for (code in list) {
-        if (code == 'length') {
-            continue
-        }
-
-        result.push({code: code, person_duration: list[code].person_duration})
-    }
-
-    return result
-}
- */
-
-/**
- * Определяет подразделение для подсчета (из двух).
- * @param {object} list - Объект, содержащий как минимум два подразделения.
- * @returns {string|string[]} Код ветки или массив кодов при равенстве.
-function getMaxBranch(list) {
-    var arr = objectToArray(list) // тут цикл
-    if (arr[0].person_duration == arr[1].person_duration) {
-        return [arr[0].code, arr[1].code]
-    }
-
-    if (arr[0].person_duration > arr[1].person_duration) {
-        return arr[0].code
-    }
-
-    return arr[1].code
-}
- */
-
-/**
  * Определяет подразделение(я) с максимальной продолжительностью.
  * @param {object} list - Объект с любым количеством подразделений.
  * @returns {string|string[]|null} Код, массив кодов или null, если список пуст.
@@ -569,10 +531,11 @@ function getMetricsOfBranches(params) {
 
     addLog("Получение списка сотрудников")
     var query = getPersonsSql(params)
+    addLog(query)
     var persons = SQL_LIB.optXExec(query, 'corecpu')
 
     addLog("Подсчет результатов по сотрудникам")
-    var person, code
+    var person
     for (person in persons) {
         calculate = setDataPerson(calculate, person, params)
         metrics = setMetricsPerson(metrics, person, calculate)
@@ -773,7 +736,7 @@ function isAdaptation(id, code) {
 function createAdaptations(metrics) {
     var result = []
 
-    var personCode, metric, personId, adaptation
+    var personCode, personId, education
     for (personCode in metrics) {
         addLog(" ")
         addLog(" ")
@@ -798,6 +761,8 @@ function createAdaptations(metrics) {
             addLog("Адаптация была назначена ранее.")
             continue
         }
+
+        addLog(tools.object_to_text(metricsOfPerson.result, "json"))
 
         //education = ADAPTATION.createAdaptation(personId, {
         //    defaultProgId: 7231245838301082062,
@@ -832,17 +797,23 @@ function main(params) {
 }
 
 /**
- * Получает агрегированные данные о продажах по категории и месяцам.
- * @param {string} find - Категория для поиска.
+ * Получает метрики продаж из таблицы t_asale.
+ * @param {string} find - Поисковая строка для категории.
  * @param {number} ym - Год и месяц для фильтрации данных (например, 2512).
- * @returns {object} Результат выполнения SQL-запроса.
+ * @param {string} fctField - Поле для расчета факта. По умолчанию 'sa.qty'.
+ * @returns {object} Результат выполнения запроса.
  */
-function getGrossSim(find, ym) {
+function getMetricOfTSales(find, ym, fctField) {
+    var fct = fctField
+    if (fct == undefined) {
+        fct = "sa.qty"
+    }
+
     var query = (
         "select \n" +
         "    sa.ym \n" +
         "    ,CONCAT(sa.user_tab_no, '_', sa.branchcode) as id \n" +
-        "    ,sum(sa.qty) as fct \n" +
+        "    ,sum(" + fct + ") as fct \n" +
         "from core.t_asale as sa \n" +
         "where 1=1 \n" +
         "    and sa.up_category ilike '" + find + "' \n" +
@@ -850,6 +821,8 @@ function getGrossSim(find, ym) {
         "    and sa.ym in (" + ym + ") \n" +
         "group by 1,2"
     )
+    addLog(" ")
+    addLog(query)
 
     return  SQL_LIB.optXExec(query, 'corecpu', {field: "id"})
 }
@@ -860,7 +833,7 @@ function getGrossSim(find, ym) {
  * @param {number} ym - Год и месяц для фильтрации данных (например, 2512).
  * @returns {object} Результат выполнения SQL-запроса с данными о выручке.
  */
-function getRevenue(find, ym) {
+function getMetricOfMotivation(find, ym) {
     var query = (
         "select \n" +
         "    sa.ym \n" +
@@ -890,17 +863,27 @@ function getListOfMetrics(ym) {
         "73": {
             code: "gross_sim",
             name: "Gross sim",
-            values: getGrossSim("%сим-карта%", ym),
+            values: getMetricOfTSales("%сим-карта%", ym),
         },
         "303": {
             code: "product_revenue",
             name: "Товарная выручка",
-            values: getRevenue("%товарная%", ym)
+            values: getMetricOfMotivation("%товарная%", ym)
         },
         "304": {
             code: "finance_revenue",
             name: "Финансовая выручка",
-            values: getRevenue("%финанс%", ym),
+            values: getMetricOfMotivation("%финанс%", ym),
+        },
+        "305": {
+            code: "shpd",
+            name: "Продажи ШПД",
+            values: getMetricOfTSales("%шпд%", ym),
+        },
+        "306": {
+            code: "accessories",
+            name: "Аксессуары",
+            values: getMetricOfTSales("%аксессуар%", ym, "sa.full_price_rur"),
         },
     }
 }
@@ -933,6 +916,8 @@ function getBranchesMetrics(params) {
     var result = {}
 
     var query = getSqlMetricBranch(params)
+    addLog(" ")
+    addLog(query)
     var metrics = SQL_LIB.optXExec(query, 'corecpu')
 
     var metric, metricCode, branchCode
@@ -991,95 +976,9 @@ try {
     var ADAPTATION = OpenCodeLib(path)
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
 
-
-    //var calculate = {
-    //    "444384": {
-    //        "length": 4,
-    //        "7M30000": {
-    //            "person_duration": 96,
-    //            "branch_duration": 376,
-    //            "metrics": {
-    //                "gross_sim": {
-    //                    "branch": 120,
-    //                    "person": 43
-    //                },
-    //                "product_revenue": {
-    //                    "branch": 625531,
-    //                    "person": 195127
-    //                },
-    //                "finance_revenue": {
-    //                    "branch": 55056,
-    //                    "person": 22608.3
-    //                }
-    //            }
-    //        },
-    //        "VM62000": {
-    //            "person_duration": 118,
-    //            "branch_duration": 232,
-    //            "metrics": {
-    //                "gross_sim": {
-    //                    "branch": 241,
-    //                    "person": 3
-    //                },
-    //                "finance_revenue": {
-    //                    "branch": 110301,
-    //                    "person": 4089
-    //                },
-    //                "product_revenue": {
-    //                    "branch": 965089,
-    //                    "person": 25207
-    //                }
-    //            }
-    //        },
-    //        "VM62001": {
-    //            "person_duration": 118,
-    //            "branch_duration": 232,
-    //            "metrics": {
-    //                "gross_sim": {
-    //                    "branch": 241,
-    //                    "person": 3
-    //                },
-    //                "finance_revenue": {
-    //                    "branch": 110301,
-    //                    "person": 4089
-    //                },
-    //                "product_revenue": {
-    //                    "branch": 965089,
-    //                    "person": 25207
-    //                }
-    //            }
-    //        },
-    //        "VO27000": {
-    //            "person_duration": 8,
-    //            "branch_duration": 408,
-    //            "metrics": {
-    //                "product_revenue": {
-    //                    "branch": 2171194,
-    //                    "person": 25298
-    //                },
-    //                "finance_revenue": {
-    //                    "branch": 203219,
-    //                    "person": 0
-    //                },
-    //                "gross_sim": {
-    //                    "branch": 297,
-    //                    "person": 5
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
-
-    //var metrics = {}
-    //metrics = setMetricsPerson(metrics, {line_tab_num:"444384"}, calculate)
-    //addLog(tools.object_to_text(metrics, 'json'))
-
-    //return
-
-
     // TODO: период
-    var begin = "2025-11-01"
-    var end = "2025-11-30"
+    var begin = "2026-02-01"
+    var end = "2026-02-28"
     var ym = getYearMonth(begin)
 
     addLog("Получение параметров")
