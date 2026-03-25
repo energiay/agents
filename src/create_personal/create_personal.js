@@ -531,7 +531,6 @@ function getMetricsOfBranches(params) {
 
     addLog("Получение списка сотрудников")
     var query = getPersonsSql(params)
-    addLog(query)
     var persons = SQL_LIB.optXExec(query, 'corecpu')
 
     addLog("Подсчет результатов по сотрудникам")
@@ -821,8 +820,6 @@ function getMetricOfTSales(find, ym, fctField) {
         "    and sa.ym in (" + ym + ") \n" +
         "group by 1,2"
     )
-    addLog(" ")
-    addLog(query)
 
     return  SQL_LIB.optXExec(query, 'corecpu', {field: "id"})
 }
@@ -916,8 +913,6 @@ function getBranchesMetrics(params) {
     var result = {}
 
     var query = getSqlMetricBranch(params)
-    addLog(" ")
-    addLog(query)
     var metrics = SQL_LIB.optXExec(query, 'corecpu')
 
     var metric, metricCode, branchCode
