@@ -197,7 +197,6 @@ function load(settings) {
     var person
     for (person in persons) {
         loadPersonSkillCup(person, learnings, settings)
-        break
     }
 }
 
