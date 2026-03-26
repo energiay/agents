@@ -81,7 +81,7 @@ function getPersonsSql(params) {
                 "+ interval '1 month' " +
                 "- interval '1 day' \n" +
         ") a \n" +
-        "where a.employee_unit = '" + position + "' \n" +
+        "--where a.employee_unit = '" + position + "' \n" +
         "GROUP BY \n" +
         "a.office_amdocs_code " +
         "" + tabNum + " \n" +
