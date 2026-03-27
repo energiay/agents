@@ -42,62 +42,6 @@ function getAdaptationLib() {
 }
 
 /**
- * Устанавливает активности обучения для адаптации сотрудника
- * @param {Object} adaptation - Объект адаптации сотрудника
- * @param {number|string} adaptation.id - Идентификатор документа адаптации
- * @param {number|string} adaptation.person_id - Идентификатор сотрудника
- * @returns {void}
-*/
-function setActivities(adaptation) {
-    var libs = {sc: SC, learning: LEARNING}
-
-    var card = optOpenDoc(adaptation.id)
-    if (card == null) {
-        addLog("error: Не удалось открыть карточку адаптации: " + adaptation.id)
-        return
-    }
-
-    // получение активностей
-    var tasks = card.TopElem.tasks
-    var where = "This.type == 'learning' && This.status != 'passed'"
-    var activities = ArraySelect(tasks, where)
-    if (ArrayOptFirstElem(activities) == undefined) {
-        addLog("В адаптации отсутствуют активные курсы.")
-        return
-    }
-
-    var activity, res, course
-    for (activity in activities) {
-        course = getCourse(activity)
-        if (!course.success) {
-            continue
-        }
-
-        addLog(activity.id + " " + activity.name)
-        addLog(activity.object_id + " " + course.code + " " + course.name)
-
-        res = ADAPTATION.loadScLearning(adaptation.person_id, course.code, libs)
-        addLog(tools.object_to_text(res, 'json'))
-    }
-}
-
-/**
- * Получает уникальные номера лиц из базы данных.
- * @param {object} lib - Объект библиотеки для выполнения запросов к БД.
- * @returns {object} Результат выполнения SQL-запроса.
- */
-//function getPersons(lib) {
-//    var query = (
-//        "select distinct p.PERSON_NUMBER AS code \n" +
-//        "FROM stage.bi_1c_employee_registration as e \n" +
-//        "left join stage.bi_1c_persons p on e.PERSON_REF_ID = p.REF_ID \n" +
-//        "where p.PERSON_NUMBER is not null"
-//    )
-//
-//    return lib.optXExec(query, 'corecpu')
-//}
-
-/**
  * Извлекает коды, начинающиеся с "SC_", из списка задач.
  * @param {object} tasks - Список объектов задач для обработки.
  * @returns {object} Объект с уникальными кодами "SC_" в качестве ключей.
@@ -146,7 +90,28 @@ function getLearnings(ids) {
     return result
 }
 
-function loadPersonSkillCup(person, learnings, settings) {
+/**
+ * Записывает результат успешно выполненного в карточку агента.
+ * @param {object} value - Результат выполнения для сохранения.
+ */
+function writeSuccess(value) {
+    var success = tools.object_to_text(value, "json")
+
+    var id = oData.id
+    var card = tools.open_doc(Int(id))
+    card.TopElem.custom_elems.ObtainChildByKey('success').value = success
+    card.Save()
+}
+
+/**
+ * Загружает курсы SkillCup для указанного сотрудника.
+ * @param {object} success - Объект для отслеживания успешных операций.
+ * @param {object} person - Объект, представляющий сотрудника.
+ * @param {object} learnings - Объект с кодами курсов SkillCup.
+ * @param {object} settings - Объект с настройками и библиотеками.
+ * @returns {object} Объект `success` с обновленными результатами.
+ */
+function loadPersonSkillCup(success, person, learnings, settings) {
     var lib = settings.libs.adaptation
 
     var code, res
@@ -154,9 +119,16 @@ function loadPersonSkillCup(person, learnings, settings) {
         addLog(" ")
         addLog("Сотрудник: " + tools.object_to_text(person, "json"))
         addLog("Код sc курса: " + code)
+
         res = lib.loadScLearning(person.code, code, settings.libs)
+        if (res.success) {
+            success[person.id + "_" + code] = true
+        }
+
         addLog(tools.object_to_text(res, "json"))
     }
+
+    return success
 }
 
 /**
@@ -172,7 +144,7 @@ function getPersonsFromLms() {
         "AND ps.position_common_id in ( \n" +
             "6246751210782330255," +    // СП
             "624675121550118958" +      // ДМ
-        ")"
+        ")-- AND cs.code = '444238'"
     )
 
     return XQuery("sql: " + query)
@@ -184,6 +156,8 @@ function getPersonsFromLms() {
  * @returns {void}
  */
 function load(settings) {
+    var success = {}
+
     addLog("Получение списка сотрудников.")
     var persons = getPersonsFromLms()
     if (ArrayOptFirstElem(persons) == undefined) {
@@ -196,8 +170,10 @@ function load(settings) {
     addLog("Обработка активностей по каждому сотруднику.")
     var person
     for (person in persons) {
-        loadPersonSkillCup(person, learnings, settings)
+        success = loadPersonSkillCup(success, person, learnings, settings)
     }
+
+    writeSuccess(success)
 }
 
 
