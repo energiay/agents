@@ -6,7 +6,7 @@
 function addLog(value, name) {
     var sLogName = name
     if (sLogName == undefined) {
-        sLogName = "load_sc_from_typical_adapt"
+        sLogName = "load_sc_from_typical_adapt_full"
     }
 
     EnableLog(sLogName)
