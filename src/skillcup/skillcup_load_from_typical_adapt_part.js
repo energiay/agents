@@ -98,8 +98,8 @@ function getLearnings(ids) {
 function getSuccess() {
 
     // в этом агенте хранятся успешно загруженные тренировки
-    //var id = 7268461818169353041
-    var id = "7268813426643136606"
+    var id = "7268461818169353041"
+    //var id = "7268813426643136606"
     var card = tools.open_doc(Int(id))
     var success = card.TopElem.custom_elems.ObtainChildByKey('success').value
 
@@ -110,40 +110,57 @@ function getSuccess() {
     return null
 }
 
+/**
+ * Загружает тренировки SkillCup для указанного пользователя.
+ * Проверяет наличие тренировок в адаптационной программе
+ * и их статус загрузки. Логирует процесс.
+ *
+ * @param {object} success - Объект для отслеживания успешных загрузок.
+ * @param {object} person - Объект с информацией о сотруднике.
+ * @param {object} learnings - Объект с информацией о активностях.
+ * @param {object} settings - Объект с настройками и библиотеками.
+ * @returns {void}
+ */
 function loadPersonSkillCup(success, person, learnings, settings) {
     var lib = settings.libs.adaptation
     var sc = settings.libs.sc
+    var channel = "monobrand"
+
+    addLog(" ")
+    addLog("---")
+    addLog("Сотрудник: " + tools.object_to_text(person, "json"))
 
     // получить тренировки за последние 5 дней
-    var trainings = sc.loadTrainingsForUser(person.code, 'monobrand', 5)
+    var trainings = sc.loadTrainingsForUser(person.code, channel, 5)
+    addLog("trainings: " + tools.object_to_text(trainings, "json"))
+
     if ( !trainings.success ) {
         return
     }
 
+    var arrTrainings = trainings.data.trainings
+    if ( ArrayOptFirstElem(arrTrainings) == undefined ) {
+        return
+    }
+
     var training, res, code
-    for (training in trainings.data.trainings) {
-        code = "SC_monobrand_" + training.content.id
+    for (training in arrTrainings) {
+        code = "SC_" + channel + "_" + training.content.id
 
-        // пропустить тренинг, если его нет типовой программе адаптации
+        // пропустить тренинг, если его нет в типовой программе адаптации
         if (learnings.GetOptProperty(code) == undefined) {
+            addLog("skip: " + code + " тренинг вне типовой программы.")
             continue
         }
 
-        // пропустить тренинг, если если он уже был загружен при полной загрузке
+        // пропустить тренинг, если он уже был загружен при полной загрузке
         if (success.GetOptProperty(person.id + "_" + code, false)) {
-            addLog(" ")
-            addLog("Сотрудник: " + tools.object_to_text(person, "json"))
-            addLog("success: " + code)
+            addLog("skip: " + code + " тренинг был загружен при полной загрузке.")
             continue
         }
 
-        addLog(" ")
-        addLog("Сотрудник: " + tools.object_to_text(person, "json"))
-        addLog("Код sc тренинга: " + code)
-
-        //res = lib.loadScLearning(person.code, code, settings.libs)
-
-        addLog(tools.object_to_text(res, "json"))
+        res = lib.loadScLearning(person.code, code, settings.libs)
+        addLog(code + " " + tools.object_to_text(res, "json"))
     }
 }
 
@@ -153,7 +170,7 @@ function loadPersonSkillCup(success, person, learnings, settings) {
  */
 function getPersonsFromLms() {
     var query = (
-        "SELECT top 2000 cs.id, cs.code, cs.fullname \n" +
+        "SELECT cs.id, cs.code, cs.fullname \n" +
         "FROM collaborators AS cs \n" +
         "LEFT JOIN positions AS ps ON ps.id = cs.position_id \n" +
         "WHERE cs.is_dismiss = 0  \n" +
