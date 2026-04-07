@@ -19,7 +19,6 @@ function addLog(value, name) {
  */
 function getSkillCupLib() {
     var sc_path = 'x-local://wt/web/custom_projects/libs/skill_cup_load_lib.js'
-    DropFormsCache(sc_path)
     return OpenCodeLib(sc_path)
 }
 
@@ -92,68 +91,41 @@ function getLearnings(ids) {
 }
 
 /**
- * Получает и анализирует JSON-данные из элемента 'success' документа.
- * @returns {object} Разобранные JSON-данные из элемента 'success'.
+ * Записывает результат успешно выполненного в карточку агента.
+ * @param {object} value - Результат выполнения для сохранения.
  */
-function getSuccess() {
+function writeSuccess(value) {
+    var success = tools.object_to_text(value, "json")
 
-    // в этом агенте хранятся успешно загруженные тренировки
-    var id = "7268461818169353041"
-    //var id = "7268813426643136606"
+    var id = oData.id
     var card = tools.open_doc(Int(id))
-    var success = card.TopElem.custom_elems.ObtainChildByKey('success').value
-
-    try {
-        return ParseJson(success)
-    } catch(err) {}
-
-    return null
+    card.TopElem.custom_elems.ObtainChildByKey('success').value = success
+    card.Save()
 }
 
 /**
- * Загружает тренировки SkillCup для указанного пользователя.
- * Проверяет наличие тренировок в адаптационной программе
- * и их статус загрузки. Логирует процесс.
- *
- * @param {object} success - Объект для отслеживания успешных загрузок.
- * @param {object} person - Объект с информацией о сотруднике.
- * @param {object} learnings - Объект с информацией о активностях.
+ * Загружает курсы SkillCup для указанного сотрудника.
+ * @param {object} success - Объект для отслеживания успешных операций.
+ * @param {object} person - Объект, представляющий сотрудника.
+ * @param {object} learnings - Объект с кодами курсов SkillCup.
  * @param {object} settings - Объект с настройками и библиотеками.
- * @returns {void}
+ * @returns {object} Объект `success` с обновленными результатами.
  */
 function loadPersonSkillCup(success, person, learnings, settings) {
     var lib = settings.libs.adaptation
-    var sc = settings.libs.sc
-    var channel = "monobrand"
 
-    addLog(" ")
-    addLog("---")
-    addLog("Сотрудник: " + tools.object_to_text(person, "json"))
-
-    // получить все тренировки сотрудника
-    var trainings = sc.loadTrainingsForUser(person.code, channel)
-    addLog("trainings: " + tools.object_to_text(trainings, "json"))
-
-    if ( !trainings.success ) {
-        return success
-    }
-
-    var training, code, res
-    for (training in trainings.data.trainings) {
-        code = "SC_" + channel + "_" + training.content.id
-
-        // пропустить тренинг, если его нет в типовой программе адаптации
-        if (learnings.GetOptProperty(code) == undefined) {
-            addLog("skip: " + code + " тренинг вне типовой программы.")
-            continue
-        }
+    var code, res
+    for (code in learnings) {
+        addLog(" ")
+        addLog("Сотрудник: " + tools.object_to_text(person, "json"))
+        addLog("Код sc курса: " + code)
 
         res = lib.loadScLearning(person.code, code, settings.libs)
         if (res.success) {
             success[person.id + "_" + code] = true
         }
 
-        addLog(code + " " + tools.object_to_text(res, "json"))
+        addLog(tools.object_to_text(res, "json"))
     }
 
     return success
@@ -179,19 +151,6 @@ function getPersonsFromLms() {
 }
 
 /**
- * Записывает в карточку агента значения `value`.
- * @param {object} value - Результат выполнения для сохранения.
- */
-function writeSuccess(value) {
-    var success = tools.object_to_text(value, "json")
-
-    var id = oData.id
-    var card = tools.open_doc(Int(id))
-    card.TopElem.custom_elems.ObtainChildByKey('success').value = success
-    card.Save()
-}
-
-/**
  * Загружает данные SkillCup для списка пользователей.
  * @param {object} settings - Настройки для получения списка пользователей.
  * @returns {void}
@@ -207,8 +166,6 @@ function load(settings) {
 
     addLog("Получение списка активностей.")
     var learnings = getLearnings(settings.programs)
-
-    addLog("learnings: " + tools.object_to_text(learnings, "json"))
 
     addLog("Обработка активностей по каждому сотруднику.")
     var person
