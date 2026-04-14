@@ -81,7 +81,7 @@ function getPersonsSql(params) {
                 "+ interval '1 month' " +
                 "- interval '1 day' \n" +
         ") a \n" +
-        "--where a.employee_unit = '" + position + "' \n" +
+        "where a.employee_unit = '" + position + "' \n" +
         "GROUP BY \n" +
         "a.office_amdocs_code " +
         "" + tabNum + " \n" +
@@ -851,6 +851,71 @@ function getMetricOfMotivation(find, ym) {
 }
 
 /**
+ * Возвращает категории на основе переданного кода.
+ * @param {string} code - Код для определения категорий.
+ * @returns {string[]|null} Массив категорий или null, если код не найден.
+ */
+function getUpCateries(code) {
+    if (code == 'gross_sim') {
+        return [
+            'Сим-карта (Яндекс+)'
+            ,'Сим-карта (Тариф по запросу)'
+            ,'Сим-карта'
+            ,'Акционная сим-карта/пресет'
+            ,'Сим-карта (годовой абонемент)'
+        ]
+    }
+
+    if (code == 'shpd') {
+        return ['ШПД (Подключение)']
+    }
+
+    return null
+}
+
+/**
+ * Получает факт сотрудника по коду.
+ * @param {string} code - Код для определения категорий.
+ * @returns {object} Объект с фактическими метриками.
+ * @throws {string} Если категории не определены.
+ */
+function getMetricsFct(code) {
+    var upCategories = getUpCateries(code)
+    if (null) {
+        throw "категории не определены: " + code
+    }
+
+    var query = (
+        "SELECT \n" +
+        "    CONCAT(m.office_code, '_', m.emp_tab_num) as id, \n" +
+        "    sum(m.full_price_rur) as fct \n" +
+        "FROM stage.motivation_monobrand_office_data_ext as m \n" +
+        "where 1=1 \n" +
+        "   and m.ym = 2602 \n" +
+        "   and m.up_category in (" +
+                "'" + upCategories.join("','") + "'" +
+            ") \n" +
+        "   --and m.office_code = '006000' \n" +
+        "   -- исключаем возвраты и ... \n" +
+        "   and m.motivation_flg = 1\n" +
+        "   -- исключаем маркетплейсы \n" +
+        "   and coalesce(m.order_src_code, '') not in (" +
+               "'000000064'," +
+               "'000000062'," +
+               "'000000053'," +
+               "'000000034'," +
+               "'000000008'," +
+               "'000000018'" +
+            ") \n" +
+        "group by 1"
+    )
+    addLog(query)
+
+    return  SQL_LIB.optXExec(query, 'corecpu', {field: "id"})
+}
+
+
+/**
  * Возвращает список метрик с их описаниями.
  * @param {string} ym - период извлечения данных (год и месяц)
  * @returns {object}
@@ -860,7 +925,7 @@ function getListOfMetrics(ym) {
         "73": {
             code: "gross_sim",
             name: "Gross sim",
-            values: getMetricOfTSales("%сим-карта%", ym),
+            values: getMetricsFct('gross_sim'),
         },
         "303": {
             code: "product_revenue",
@@ -875,7 +940,7 @@ function getListOfMetrics(ym) {
         "305": {
             code: "shpd",
             name: "Продажи ШПД",
-            values: getMetricOfTSales("%шпд%", ym),
+            values: getMetricsFct('shpd'),
         },
         "306": {
             code: "accessories",
@@ -998,7 +1063,7 @@ try {
     })
 
 
-    var params = {
+    main({
         codes: Param.subs,
         begin: begin,
         end: end,
@@ -1006,9 +1071,7 @@ try {
         list_of_metrics_code: LIST_OF_METRICS_CODE,
         filial_metrics: METRICS_FILIAL,
         filial_duration: SUBS_DURATION,
-    }
-
-    main(params)
+    })
 
     addLog("end")
 }
