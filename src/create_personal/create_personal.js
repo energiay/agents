@@ -870,7 +870,78 @@ function getUpCateries(code) {
         return ['ШПД (Подключение)']
     }
 
+    if (code == 'product_revenue') {
+        return [
+            'Товарная группа 1: К1',
+            'Товарная группа 1: К2',
+            'Товарная группа 1: К3',
+            'Товарная группа 1: К4',
+            'Товарная группа 1: К5',
+            'Товарная группа 1: К6',
+            'Товарная группа 1: К7',
+            'Товарная группа 1: К8',
+            'Товарная группа 2: К1',
+            'Товарная группа 2: К2',
+            'Товарная группа 2: К3',
+            'Товарная группа 2: К4',
+            'Товарная группа 2: К5',
+            'Товарная группа 2: К6',
+            'Товарная группа 2: К7',
+            'Продажа роутера ШПД с баланса телефона'
+        ]
+    }
+
+    if (code == 'accessories') {
+        return [
+            'Товарная группа 2: К1',
+            'Товарная группа 2: К2',
+            'Товарная группа 2: К3',
+            'Товарная группа 2: К4',
+            'Товарная группа 2: К5',
+            'Товарная группа 2: К6',
+            'Товарная группа 2: К7'
+        ]
+    }
+
+    if (code == 'finance_revenue') {
+        return [
+            'Консультация по установке приложений и активации программ',
+            'Консультация по учетным записям телефона',
+            'Настройка базовых функций телефона',
+            'Пакет настроек Экспресс-настройка',
+            'Пакет настроек Оптимальный',
+            'Пакет настроек Премиум',
+            'Пакет настроек Под ключ',
+            'Пакет настроек базовый',
+            'Пакет настроек функциональный',
+            'Страхование жизни/здоровья',
+            'Страхование покупки',
+            'Аппаратная наклейка пленки'
+        ]
+    }
+
     return null
+}
+
+/**
+ * Определяет, нужно ли измерять в рублях
+ * @param {string} code - Код для проверки.
+ * @returns {boolean}
+ */
+function isRur(code) {
+    if (code == 'accessories') {
+        return true
+    }
+
+    if (code == 'product_revenue') {
+        return true
+    }
+
+    if (code == 'finance_revenue') {
+        return true
+    }
+
+    return false
 }
 
 /**
@@ -885,10 +956,15 @@ function getMetricsFct(code, ym) {
         throw "категории не определены: " + code
     }
 
+    var field = "m.motivation_item_qty"
+    if ( isRur(code) ) {
+        field = "m.full_price_rur*m.motivation_item_qty"
+    }
+
     var query = (
         "SELECT \n" +
-        "    CONCAT(m.office_code, '_', m.emp_tab_num) as id, \n" +
-        "    sum(m.motivation_item_qty) as fct \n" +
+        "    CONCAT(m.emp_tab_num, '_', m.office_code) as id, \n" +
+        "    sum(" + field + ") as fct \n" +
         "FROM stage.motivation_monobrand_office_data_ext as m \n" +
         "where 1=1 \n" +
         "   --and m.office_code = '006000' \n" +
@@ -909,7 +985,7 @@ function getMetricsFct(code, ym) {
             ") \n" +
         "group by 1"
     )
-    addLog(query)
+    //addLog(query)
 
     return  SQL_LIB.optXExec(query, 'corecpu', {field: "id"})
 }
@@ -930,12 +1006,12 @@ function getListOfMetrics(ym) {
         "303": {
             code: "product_revenue",
             name: "Товарная выручка",
-            values: getMetricOfMotivation("%товарная%", ym)
+            values: getMetricsFct('product_revenue', ym)
         },
         "304": {
             code: "finance_revenue",
             name: "Финансовая выручка",
-            values: getMetricOfMotivation("%финанс%", ym),
+            values: getMetricsFct('finance_revenue', ym),
         },
         "305": {
             code: "shpd",
@@ -945,7 +1021,7 @@ function getListOfMetrics(ym) {
         "306": {
             code: "accessories",
             name: "Аксессуары",
-            values: getMetricOfTSales("%аксессуар%", ym, "sa.full_price_rur"),
+            values: getMetricsFct('accessories', ym)
         },
     }
 }
@@ -1046,6 +1122,8 @@ try {
     // список метрик
     var LIST_OF_METRICS = getListOfMetrics(ym) // по id
     var LIST_OF_METRICS_CODE = getMetricsFromCode(LIST_OF_METRICS) // по коду
+    //addLog(tools.object_to_text(LIST_OF_METRICS, "json"))
+    //addLog(tools.object_to_text(LIST_OF_METRICS_CODE, "json"))
 
     // метрики по филиалам за период
     var METRICS_FILIAL = getBranchesMetrics({
