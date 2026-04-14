@@ -888,13 +888,9 @@ function getMetricsFct(code, ym) {
     var query = (
         "SELECT \n" +
         "    CONCAT(m.office_code, '_', m.emp_tab_num) as id, \n" +
-        "    sum(m.full_price_rur) as fct \n" +
+        "    sum(m.motivation_item_qty) as fct \n" +
         "FROM stage.motivation_monobrand_office_data_ext as m \n" +
         "where 1=1 \n" +
-        "   and m.ym = " + ym + " \n" +
-        "   and m.up_category in (" +
-                "'" + upCategories.join("','") + "'" +
-            ") \n" +
         "   --and m.office_code = '006000' \n" +
         "   -- исключаем возвраты и ... \n" +
         "   and m.motivation_flg = 1\n" +
@@ -906,6 +902,10 @@ function getMetricsFct(code, ym) {
                "'000000034'," +
                "'000000008'," +
                "'000000018'" +
+            ") \n" +
+        "   and m.ym = " + ym + " \n" +
+        "   and m.up_category in (" +
+                "'" + upCategories.join("','") + "'" +
             ") \n" +
         "group by 1"
     )
@@ -940,7 +940,7 @@ function getListOfMetrics(ym) {
         "305": {
             code: "shpd",
             name: "Продажи ШПД",
-            values: getMetricsFct('shpd'),
+            values: getMetricsFct('shpd', ym),
         },
         "306": {
             code: "accessories",
