@@ -874,14 +874,14 @@ function getUpCateries(code) {
 }
 
 /**
- * Получает факт сотрудника по коду.
+ * Извлекает метрики `fct` по сотруднику на основе кода `code` и года-месяца `ym`.
  * @param {string} code - Код для определения категорий.
- * @returns {object} Объект с фактическими метриками.
- * @throws {string} Если категории не определены.
+ * @param {(number|string)} ym - Год-месяц для фильтрации данных (например, 2603).
+ * @returns {object} Результат выполнения SQL-запроса.
  */
-function getMetricsFct(code) {
+function getMetricsFct(code, ym) {
     var upCategories = getUpCateries(code)
-    if (null) {
+    if (upCategories == null) {
         throw "категории не определены: " + code
     }
 
@@ -891,7 +891,7 @@ function getMetricsFct(code) {
         "    sum(m.full_price_rur) as fct \n" +
         "FROM stage.motivation_monobrand_office_data_ext as m \n" +
         "where 1=1 \n" +
-        "   and m.ym = 2602 \n" +
+        "   and m.ym = " + ym + " \n" +
         "   and m.up_category in (" +
                 "'" + upCategories.join("','") + "'" +
             ") \n" +
@@ -925,7 +925,7 @@ function getListOfMetrics(ym) {
         "73": {
             code: "gross_sim",
             name: "Gross sim",
-            values: getMetricsFct('gross_sim'),
+            values: getMetricsFct('gross_sim', ym),
         },
         "303": {
             code: "product_revenue",
