@@ -24,6 +24,11 @@ function getPositionType() {
     }
 }
 
+/**
+ * Определяет оператор сравнения на основе входного типа.
+ * @param {string} type - Тип позиции для определения оператора сравнения.
+ * @returns {string|null} Оператор сравнения ("=", "!=") или null.
+ */
 function getEqual(type) {
     var TYPE = getPositionType()
     if (type == TYPE.sp) {
@@ -745,6 +750,7 @@ function getPersonId(code) {
  */
 function isAdaptation(person_id, program_id) {
     var query = (
+        "\n" +
         "SELECT TOP 1 crs.id \n" +
         "FROM career_reserves AS crs \n" +
         "WHERE crs.person_id = " + SqlLiteral(person_id) + " \n" +
@@ -784,7 +790,7 @@ function createAdaptations(metrics, params) {
         addLog(" ")
         personId = getPersonId(personCode)
         addLog("Сотрудник: " + personCode)
-        personId = 7147583355778132228
+        //personId = 7147583355778132228
         //personId = 6188032376454057749
         if (personId == null) {
             addLog("Сотрудник не найден, уволен или их найдено несколько.")
@@ -799,7 +805,7 @@ function createAdaptations(metrics, params) {
         }
         addLog("metricsOfPerson: " + tools.object_to_text(metricsOfPerson, 'json'))
 
-        if (isAdaptation(personId, program.def_progr_id)) {
+        if ( isAdaptation(personId, program.def_progr_id) ) {
             addLog("Адаптация была назначена ранее.")
             continue
         }
@@ -816,8 +822,8 @@ function createAdaptations(metrics, params) {
         //result.push(education)
         //addLog("Адаптация: " + tools.object_to_text(education, 'json'))
 
-        sendMessage(personId)
-        break
+        //sendMessage(personId, params.position_type)
+        //break
     }
 
     addLog(" ")
@@ -826,8 +832,67 @@ function createAdaptations(metrics, params) {
     return result
 }
 
-function sendMessage(education) {
-    addLog(personId)
+/**
+ * Получает руководителей для сотрудника по типу.
+ * @param {object} person - сотрудник
+ * @param {string} type
+ * @returns {array}
+ */
+function getBosses(person, type) {
+    var TYPE = getPositionType()
+
+    // для СП ищем ДM
+    if (type == TYPE.sp) {
+        addLog("sp")
+        var bosses = RAZUM_LIB.getDmForPerson(person)
+        if (ArrayOptFirstElem(bosses) == undefined) {
+            return []
+        }
+
+        // преобразовать массив объектов в мпссив идентификаторов по полю id
+        return RAZUM_LIB.mapArray(bosses, "id")
+    }
+
+    // для ДМ ищем РГО
+    if (type == TYPE.dm) {
+        addLog("dm")
+        return RAZUM_LIB.getRgoFromPerson(person)
+    }
+
+    return []
+}
+
+/**
+ * Отправляет уведомление указанному сотруднику и его руководителям.
+ * @param {string} personId - Идентификатор сотрудника для отправки уведомления.
+ * @param {string} type - Тип, согласно которому определяются руководители
+ */
+function sendMessage(personId, type) {
+    addLog("send: " + type + " " + personId)
+    var portal = "https://bu-online.beeline.ru/"
+    var img = "download_file.html?file_id=7243682474121156596"
+    var notification = {
+        subject: "Персональное обучение",
+        html: (
+            "<div>Привет!</div>" +
+            "<div>Тестовое уведомление по персональному обучению</div>"
+        ),
+        banner: {
+            type: "yellow",
+            image: portal + img,
+            title: "Персональное обучение",
+        }
+    }
+    //NOTIFICATION.sendNotification(personId, notification)
+
+    var bosses = getBosses(personId, type)
+    addLog("bosses: " + tools.object_to_text(bosses, "json"))
+
+    var boss
+    for (boss in bosses) {
+        addLog("boss: " + boss)
+        //NOTIFICATION.sendNotification(personId, notification)
+    }
 }
 
 /**
@@ -1153,18 +1218,65 @@ function getYearMonth(date) {
     return StrCharRangePos(String(Year(dDate)), 2, 4) + sMonth
 }
 
+/**
+ * Форматирует число, добавляя ведущий ноль при необходимости.
+ * @param {number} num - Число для форматирования.
+ * @returns {string}
+ */
+function formatNum(num) {
+    if (OptInt(num) < 10) {
+        return "0" + num
+    }
+
+    return String(num)
+}
+
+/**
+ * Возвращает объект с начальной и конечной датами предыдущего месяца.
+ * @param {Date} now - Опорная дата для определения предыдущего месяца.
+ * @returns {object} Объект с начальной (`begin`) и конечной (`end`) датами.
+ */
+function getLastMonth(now) {
+    var SECONDS_OF_DAY = -86400
+    var firstDayCurrent = Date(Year(now) + "-" + Month(now) + "-01")
+    var lastDayOfPrevMonth = DateOffset(firstDayCurrent, SECONDS_OF_DAY)
+
+    var year = Year(lastDayOfPrevMonth)
+    var month = Month(lastDayOfPrevMonth)
+    var day = Day(lastDayOfPrevMonth)
+
+    return {
+        begin:  year + "-" + formatNum(month) + "-01",
+        end:    year + "-" + formatNum(month) + "-" + formatNum(day)
+    }
+}
+
+
 // entry point
 // назначение/доназначение модульной программы
 try {
     addLog("begin")
 
-    var path = 'x-local://wt/web/custom_projects/libs/adaptation_lib.js'
-    var ADAPTATION = OpenCodeLib(path)
+    var path_adapt = "x-local://wt/web/custom_projects/libs/adaptation_lib.js"
+    var ADAPTATION = OpenCodeLib(path_adapt)
+
+    var path_notif = "x-local://wt/web/custom_projects/libs/notification/"
+    var NOTIFICATION = OpenCodeLib(path_notif + "notification_lib.js")
+
+    var path_razum = "x-local://wt/web/custom_projects/razum_common/"
+    var RAZUM_LIB = OpenCodeLib(path_razum + "razum_common_lib.js")
+
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
 
+
+    // TODO: по кому формируем треки обучения: sp/dm
+    var TYPE = getPositionType()
+    var position_type = TYPE.dm
+
     // TODO: период
-    var begin = "2026-02-01"
-    var end = "2026-02-28"
+    var date = getLastMonth(Date("2026-03-10"))
+    var begin = date.begin
+    var end = date.end
     var ym = getYearMonth(begin)
 
     addLog("Получение параметров")
@@ -1182,7 +1294,6 @@ try {
         end: end,
     })
 
-    var TYPE = getPositionType()
 
     // время работы офиса
     var SUBS_DURATION = getSubsDuration({
@@ -1190,7 +1301,7 @@ try {
         begin: begin,
         end: end,
         type: "subdivision",
-        position_type: TYPE.sp,
+        position_type: position_type,
     })
 
 
@@ -1202,9 +1313,9 @@ try {
         list_of_metrics_code: LIST_OF_METRICS_CODE,
         filial_metrics: METRICS_FILIAL,
         filial_duration: SUBS_DURATION,
-        position_type: TYPE.sp,
+        position_type: position_type,
         program: {
-            def_progr_id: 7231245838301082062,
+            def_progr_id: 7231245838301082062, // TODO: идентификатор программы
             duration: 7,
             limit: 2,
         }
