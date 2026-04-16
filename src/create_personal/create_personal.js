@@ -14,6 +14,30 @@ function addLog(value, name) {
 }
 
 /**
+ * Получает типы должностей.
+ * @returns {object} Объект, содержащий аббревиатуры и полные названия должностей.
+ */
+function getPositionType() {
+    return {
+        sp: "Специалист офиса",
+        dm: "Директор магазина",
+    }
+}
+
+function getEqual(type) {
+    var TYPE = getPositionType()
+    if (type == TYPE.sp) {
+        return "="
+    }
+
+    if (type == TYPE.dm) {
+        return "!="
+    }
+
+    return null
+}
+
+/**
  * Генерирует SQL-запрос для получения статистики по рабочим часам.
  * @param {object} params - Объект, содержащий параметры для формирования запроса.
  * @returns {string} Сформированный SQL-запрос.
@@ -27,7 +51,10 @@ function getPersonsSql(params) {
     var begin = params.begin
     var end = params.end + " 23:59:59"
 
-    var position = 'Специалист'
+    var equal = getEqual(params.position_type)
+    if (equal == null) {
+        throw "не задана должность: не могу получить статистику по рабочим дням"
+    }
 
     var whereCodes = ""
     var codes = params.GetOptProperty("codes", "")
@@ -81,7 +108,7 @@ function getPersonsSql(params) {
                 "+ interval '1 month' " +
                 "- interval '1 day' \n" +
         ") a \n" +
-        "where a.employee_unit = '" + position + "' \n" +
+        "where a.employee_unit " + equal + " 'Специалист' \n" +
         "GROUP BY \n" +
         "a.office_amdocs_code " +
         "" + tabNum + " \n" +
@@ -710,14 +737,25 @@ function getPersonId(code) {
     return ArrayOptFirstElem(persons).id
 }
 
-function isAdaptation(id, code) {
+/**
+ * Проверяет, назначена ли сотруднику программа адаптации
+ * @param {number} person_id - Идентификатор сотрудника.
+ * @param {number} program_id - Идентификатор типовой программы.
+ * @returns {boolean} true, если у сотрудник есть назначенная адаптация.
+ */
+function isAdaptation(person_id, program_id) {
     var query = (
-        "SELECT TOP 1 id \n" +
-        "FROM career_reserves \n" +
-        "WHERE person_id = " + SqlLiteral(id) + " \n" +
-        "    AND code = " + SqlLiteral(code) + " \n" +
-        "    AND status = 'active'"
+        "SELECT TOP 1 crs.id \n" +
+        "FROM career_reserves AS crs \n" +
+        "WHERE crs.person_id = " + SqlLiteral(person_id) + " \n" +
+        "   AND crs.status = 'active'" +
+        "   AND crs.code in (" +
+                "SELECT ts.code " +
+                "FROM typical_development_programs AS ts " +
+                "WHERE ts.id = " + program_id +
+            ") \n"
     )
+    addLog(query)
 
     var adaptations = XQuery("sql: " + query)
     if (ArrayOptFirstElem(adaptations) == undefined) {
@@ -730,10 +768,15 @@ function isAdaptation(id, code) {
 /**
  * Создает адаптации на основе предоставленных метрик.
  * @param {object} metrics - Объект с метриками по коду сотрудника.
+ * @param {object} params - Параметры выполнения функции.
  * @returns {Array} Массив созданных адаптаций.
  */
-function createAdaptations(metrics) {
+function createAdaptations(metrics, params) {
     var result = []
+    var program = params.GetOptProperty("program")
+    if (program == undefined) {
+        throw "Треки обучения не назначены: на заданы параметры назначения."
+    }
 
     var personCode, personId, education
     for (personCode in metrics) {
@@ -741,7 +784,7 @@ function createAdaptations(metrics) {
         addLog(" ")
         personId = getPersonId(personCode)
         addLog("Сотрудник: " + personCode)
-        //personId = 7147583355778132228
+        personId = 7147583355778132228
         //personId = 6188032376454057749
         if (personId == null) {
             addLog("Сотрудник не найден, уволен или их найдено несколько.")
@@ -756,7 +799,7 @@ function createAdaptations(metrics) {
         }
         addLog("metricsOfPerson: " + tools.object_to_text(metricsOfPerson, 'json'))
 
-        if (isAdaptation(personId, "razum_personal_sp")) {
+        if (isAdaptation(personId, program.def_progr_id)) {
             addLog("Адаптация была назначена ранее.")
             continue
         }
@@ -764,20 +807,27 @@ function createAdaptations(metrics) {
         addLog(tools.object_to_text(metricsOfPerson.result, "json"))
 
         //education = ADAPTATION.createAdaptation(personId, {
-        //    defaultProgId: 7231245838301082062,
+        //    defaultProgId: program.def_progr_id,
         //    metrics: metricsOfPerson.result,
-        //    adaptationDuration: 7,
-        //    limit: 2,
+        //    adaptationDuration: program.duration,
+        //    limit: program.limit,
         //})
 
         //result.push(education)
         //addLog("Адаптация: " + tools.object_to_text(education, 'json'))
+
+        sendMessage(personId)
+        break
     }
 
     addLog(" ")
     addLog(" ")
 
     return result
+}
+
+function sendMessage(education) {
+    addLog(personId)
 }
 
 /**
@@ -791,7 +841,7 @@ function main(params) {
     addLog("Результаты: " + tools.object_to_text(metricsOfBranches, 'json'))
 
     addLog("Создание треков обучения.")
-    var result = createAdaptations(metricsOfBranches[1])
+    var result = createAdaptations(metricsOfBranches[1], params)
     addLog("Результат: " + tools.object_to_text(result, 'json'))
 }
 
@@ -1132,12 +1182,15 @@ try {
         end: end,
     })
 
+    var TYPE = getPositionType()
+
     // время работы офиса
     var SUBS_DURATION = getSubsDuration({
         codes: Param.subs,
         begin: begin,
         end: end,
         type: "subdivision",
+        position_type: TYPE.sp,
     })
 
 
@@ -1149,6 +1202,12 @@ try {
         list_of_metrics_code: LIST_OF_METRICS_CODE,
         filial_metrics: METRICS_FILIAL,
         filial_duration: SUBS_DURATION,
+        position_type: TYPE.sp,
+        program: {
+            def_progr_id: 7231245838301082062,
+            duration: 7,
+            limit: 2,
+        }
     })
 
     addLog("end")
