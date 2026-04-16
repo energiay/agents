@@ -748,12 +748,12 @@ function isAdaptation(person_id, program_id) {
         "SELECT TOP 1 crs.id \n" +
         "FROM career_reserves AS crs \n" +
         "WHERE crs.person_id = " + SqlLiteral(person_id) + " \n" +
-        "   AND crs.status = 'active'" +
-        "   AND crs.code in (" +
-                "SELECT ts.code " +
-                "FROM typical_development_programs AS ts " +
-                "WHERE ts.id = " + program_id +
-            ") \n"
+        "   AND crs.status = 'active' \n" +
+        "   AND crs.code in ( \n" +
+        "        SELECT ts.code \n" +
+        "        FROM typical_development_programs AS ts \n" +
+        "        WHERE ts.id = " + program_id + "\n" +
+        "   )"
     )
     addLog(query)
 
