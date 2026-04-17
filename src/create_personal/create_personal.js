@@ -761,7 +761,7 @@ function isAdaptation(person_id, program_id) {
         "        WHERE ts.id = " + program_id + "\n" +
         "   )"
     )
-    addLog(query)
+    //addLog(query)
 
     var adaptations = XQuery("sql: " + query)
     if (ArrayOptFirstElem(adaptations) == undefined) {
@@ -907,7 +907,7 @@ function main(params) {
 
     addLog("Создание треков обучения.")
     var result = createAdaptations(metricsOfBranches[1], params)
-    addLog("Результат: " + tools.object_to_text(result, 'json'))
+    addLog("Результат создания треков: " + tools.object_to_text(result, 'json'))
 }
 
 /**
@@ -1231,7 +1231,7 @@ function formatNum(num) {
     return String(num)
 }
 
-/**
+/*
  * Возвращает объект с начальной и конечной датами предыдущего месяца.
  * @param {Date} now - Опорная дата для определения предыдущего месяца.
  * @returns {object} Объект с начальной (`begin`) и конечной (`end`) датами.
@@ -1251,9 +1251,59 @@ function getLastMonth(now) {
     }
 }
 
+/**
+ * Формирует параметры для получения метрик и отчетов.
+ * @param {Date} dateData - Дата для определения отчетного периода.
+ * @returns {object}
+ */
+function createParams(dateData) {
+    // TODO: по кому формируем треки обучения: sp/dm
+    var TYPE = getPositionType()
+    var position_type = TYPE.sp
+
+    // TODO: период
+    var date = getLastMonth(dateData)
+    var begin = date.begin
+    var end = date.end
+    var ym = getYearMonth(begin)
+
+    addLog("Получение параметров")
+
+    // список метрик
+    var LIST_OF_METRICS = getListOfMetrics(ym) // по id
+    var LIST_OF_METRICS_CODE = getMetricsFromCode(LIST_OF_METRICS) // по коду
+
+    // метрики по филиалам за период
+    var METRICS_FILIAL = getBranchesMetrics({
+        list: LIST_OF_METRICS,
+        begin: begin,
+        end: end,
+    })
+
+    // время работы офиса
+    var SUBS_DURATION = getSubsDuration({
+        codes: Param.subs,
+        begin: begin,
+        end: end,
+        type: "subdivision",
+        position_type: position_type,
+    })
+
+
+    return {
+        begin: begin,
+        end: end,
+        position_type: position_type,
+        list_of_metrics: LIST_OF_METRICS,
+        list_of_metrics_code: LIST_OF_METRICS_CODE,
+        metrics_filial: METRICS_FILIAL,
+        subs_duration: SUBS_DURATION,
+    }
+}
+
+
 
 // entry point
-// назначение/доназначение модульной программы
 try {
     addLog("begin")
 
@@ -1268,52 +1318,18 @@ try {
 
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
 
-
-    // TODO: по кому формируем треки обучения: sp/dm
-    var TYPE = getPositionType()
-    var position_type = TYPE.dm
-
-    // TODO: период
-    var date = getLastMonth(Date("2026-03-10"))
-    var begin = date.begin
-    var end = date.end
-    var ym = getYearMonth(begin)
-
-    addLog("Получение параметров")
-
-    // список метрик
-    var LIST_OF_METRICS = getListOfMetrics(ym) // по id
-    var LIST_OF_METRICS_CODE = getMetricsFromCode(LIST_OF_METRICS) // по коду
-    //addLog(tools.object_to_text(LIST_OF_METRICS, "json"))
-    //addLog(tools.object_to_text(LIST_OF_METRICS_CODE, "json"))
-
-    // метрики по филиалам за период
-    var METRICS_FILIAL = getBranchesMetrics({
-        list: LIST_OF_METRICS,
-        begin: begin,
-        end: end,
-    })
-
-
-    // время работы офиса
-    var SUBS_DURATION = getSubsDuration({
-        codes: Param.subs,
-        begin: begin,
-        end: end,
-        type: "subdivision",
-        position_type: position_type,
-    })
-
+    // TODO: задать дату назначения можно тут
+    var params = createParams(Date())
 
     main({
         codes: Param.subs,
-        begin: begin,
-        end: end,
-        list_of_metrics: LIST_OF_METRICS,
-        list_of_metrics_code: LIST_OF_METRICS_CODE,
-        filial_metrics: METRICS_FILIAL,
-        filial_duration: SUBS_DURATION,
-        position_type: position_type,
+        begin: params.begin,
+        end: params.end,
+        list_of_metrics: params.list_of_metrics,
+        list_of_metrics_code: params.list_of_metrics_code,
+        filial_metrics: params.metrics_filial,
+        filial_duration: params.subs_duration,
+        position_type: params.position_type,
         program: {
             def_progr_id: 7231245838301082062, // TODO: идентификатор программы
             duration: 7,
