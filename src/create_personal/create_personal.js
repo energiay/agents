@@ -48,18 +48,17 @@ function getEqual(type) {
  * @returns {string} Сформированный SQL-запрос.
  */
 function getPersonsSql(params) {
+    var TYPE = getPositionType()
+
+    var position = ", a.employee_unit --роль 1с"
     var tabNum = ",a.line_tab_num"
     if (params.GetOptProperty("type") == "subdivision") {
         tabNum = ""
+        position = ""
     }
 
     var begin = params.begin
     var end = params.end + " 23:59:59"
-
-    var equal = getEqual(params.position_type)
-    if (equal == null) {
-        throw "не задана должность: не могу получить статистику по рабочим дням"
-    }
 
     var whereCodes = ""
     var codes = params.GetOptProperty("codes", "")
@@ -74,7 +73,7 @@ function getPersonsSql(params) {
         "SELECT \n" +
         "    a.office_amdocs_code " +
         "    " + tabNum + " \n" +
-        "    , a.employee_unit --роль 1с \n" +
+        "    " + position + " \n" +
         "    , a.exp_date \n" +
         "    , sum(duration_vacation) AS duration_vacation \n" +
         "FROM ( \n" +
@@ -83,8 +82,8 @@ function getPersonsSql(params) {
         "       , p.PERSON_NUMBER as line_tab_num \n" +
         "       , case when o.employee_unit LIKE '%пециалист%' \n" +
         "           OR o.employee_unit LIKE '%пециалист' \n" +
-        "           THEN 'Специалист' \n" +
-        "           ELSE 'Директор магазина' \n" +
+        "           THEN '" + TYPE.sp + "' \n" +
+        "           ELSE '" + TYPE.dm + "' \n" +
         "       END AS employee_unit --роль 1с \n" +
         "       , date_trunc('month', e.oper_date) " +
                     "+ interval '1 month' - interval '1 day' as exp_date \n" +
@@ -106,18 +105,17 @@ function getPersonsSql(params) {
         "       ,p.PERSON_NUMBER \n" +
         "       ,case when o.employee_unit LIKE '%пециалист%' \n" +
         "           OR o.employee_unit LIKE '%пециалист' \n" +
-        "           THEN 'Специалист' \n" +
-        "           ELSE 'Директор магазина' \n" +
+        "           THEN '" + TYPE.sp + "' \n" +
+        "           ELSE '" + TYPE.dm + "' \n" +
         "       END \n" +
         "       ,date_trunc('month', e.oper_date) " +
                 "+ interval '1 month' " +
                 "- interval '1 day' \n" +
         ") a \n" +
-        "where a.employee_unit " + equal + " 'Специалист' \n" +
         "GROUP BY \n" +
         "a.office_amdocs_code " +
         "" + tabNum + " \n" +
-        ",a.employee_unit --роль 1с \n" +
+        "" + position + " \n" +
         ",a.exp_date"
     )
 }
@@ -493,6 +491,11 @@ function calcThreeBranches(data) {
     return null
 }
 
+/**
+ * Вычисляет метрики на основе предоставленных данных о ветвях.
+ * @param {object} data - Объект, содержащий информацию для расчета метрик.
+ * @returns {any|null} Рассчитанная метрика или null, если расчет невозможен.
+ */
 function calcMetrics(data) {
     if (data.branches.length == 1) {
         return getValueFromBranch(data)
@@ -560,6 +563,7 @@ function setMetricsPerson(metrics, person, calculate) {
 function getMetricsOfBranches(params) {
     var calculate = {}
     var metrics = {}
+    var positions = {}
 
     addLog("Получение списка сотрудников")
     var query = getPersonsSql(params)
@@ -570,9 +574,10 @@ function getMetricsOfBranches(params) {
     for (person in persons) {
         calculate = setDataPerson(calculate, person, params)
         metrics = setMetricsPerson(metrics, person, calculate)
+        positions[String(person.line_tab_num)] = String(person.employee_unit)
     }
 
-    return [calculate, metrics]
+    return [calculate, metrics, positions]
 }
 
 /**
@@ -777,7 +782,7 @@ function isAdaptation(person_id, program_id) {
  * @param {object} params - Параметры выполнения функции.
  * @returns {Array} Массив созданных адаптаций.
  */
-function createAdaptations(metrics, params) {
+function createAdaptations(metrics, positions, params) {
     var result = []
     var program = params.GetOptProperty("program")
     if (program == undefined) {
@@ -822,8 +827,9 @@ function createAdaptations(metrics, params) {
         //result.push(education)
         //addLog("Адаптация: " + tools.object_to_text(education, 'json'))
 
-        //sendMessage(personId, params.position_type)
-        //break
+        addLog(personId + " - " + personCode + " - " + positions[personCode])
+        sendMessage(personId, positions[personCode])
+        break
     }
 
     addLog(" ")
@@ -849,7 +855,7 @@ function getBosses(person, type) {
             return []
         }
 
-        // преобразовать массив объектов в мпссив идентификаторов по полю id
+        // преобразовать массив объектов в массив идентификаторов по полю id
         return RAZUM_LIB.mapArray(bosses, "id")
     }
 
@@ -868,7 +874,6 @@ function getBosses(person, type) {
  * @param {string} type - Тип, согласно которому определяются руководители
  */
 function sendMessage(personId, type) {
-    addLog("send: " + type + " " + personId)
     var portal = "https://bu-online.beeline.ru/"
     var img = "download_file.html?file_id=7243682474121156596"
     var notification = {
@@ -906,7 +911,8 @@ function main(params) {
     addLog("Результаты: " + tools.object_to_text(metricsOfBranches, 'json'))
 
     addLog("Создание треков обучения.")
-    var result = createAdaptations(metricsOfBranches[1], params)
+    var positions = metricsOfBranches[2]
+    var result = createAdaptations(metricsOfBranches[1], positions, params)
     addLog("Результат создания треков: " + tools.object_to_text(result, 'json'))
 }
 
@@ -1102,7 +1108,7 @@ function getMetricsFct(code, ym) {
     )
     //addLog(query)
 
-    return  SQL_LIB.optXExec(query, 'corecpu', {field: "id"})
+    return SQL_LIB.optXExec(query, 'corecpu', {field: "id"})
 }
 
 
@@ -1257,10 +1263,6 @@ function getLastMonth(now) {
  * @returns {object}
  */
 function createParams(dateData) {
-    // TODO: по кому формируем треки обучения: sp/dm
-    var TYPE = getPositionType()
-    var position_type = TYPE.sp
-
     // TODO: период
     var date = getLastMonth(dateData)
     var begin = date.begin
@@ -1286,14 +1288,12 @@ function createParams(dateData) {
         begin: begin,
         end: end,
         type: "subdivision",
-        position_type: position_type,
     })
 
 
     return {
         begin: begin,
         end: end,
-        position_type: position_type,
         list_of_metrics: LIST_OF_METRICS,
         list_of_metrics_code: LIST_OF_METRICS_CODE,
         metrics_filial: METRICS_FILIAL,
@@ -1319,6 +1319,7 @@ try {
     var SQL_LIB = OpenCodeLib("x-local://wt/web/custom_projects/libs/sql_lib.js")
 
     // TODO: задать дату назначения можно тут
+    // если не задано то отчетный период - прошлый месяц
     var params = createParams(Date())
 
     main({
@@ -1329,11 +1330,10 @@ try {
         list_of_metrics_code: params.list_of_metrics_code,
         filial_metrics: params.metrics_filial,
         filial_duration: params.subs_duration,
-        position_type: params.position_type,
         program: {
-            def_progr_id: 7231245838301082062, // TODO: идентификатор программы
-            duration: 7,
-            limit: 2,
+            def_progr_id: 7231245838301082062, // TODO: программа для назначения
+            duration: 7, // TODO: продолжительность назначенной программы в днях
+            limit: 2, // TODO: сколько активностей назначать из программы
         }
     })
 
