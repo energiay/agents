@@ -43,28 +43,39 @@ function getEqual(type) {
 }
 
 /**
- * Генерирует SQL-запрос для получения статистики по рабочим часам.
- * @param {object} params - Объект, содержащий параметры для формирования запроса.
- * @returns {string} Сформированный SQL-запрос.
+ * Подготавливает параметры для SQL-запроса данных о сотрудниках.
+ * @param {object} Параметры для формирования параметров (для sql-запроса).
+ * @returns {object} Параметры для SQL-запроса.
  */
-function getPersonsSql(params) {
+function createParamsPersonSql(settings) {
     var TYPE = getPositionType()
 
-    var position = ", a.employee_unit --роль 1с"
     var tabNum = ",a.line_tab_num"
-    if (params.GetOptProperty("type") == "subdivision") {
+    var position = ", a.employee_unit --роль 1с"
+    if (settings.GetOptProperty("type") == "subdivision") {
         tabNum = ""
         position = ""
     }
 
-    var begin = params.begin
-    var end = params.end + " 23:59:59"
+    var begin = settings.begin
+    var end = settings.end + " 23:59:59"
 
-    var whereCodes = ""
-    var codes = params.GetOptProperty("codes", "")
-    if (codes != "") {
-        whereCodes = "AND s.CODE_POINTS_SALE in (" + codes + " )"
+    return {
+        begin: begin,
+        end: end,
+        type: TYPE,
+        tabNum: tabNum,
+        position: position,
     }
+}
+
+/**
+ * Генерирует SQL-запрос для получения статистики по рабочим человекочасам.
+ * @param {object} params - Объект, содержащий параметры для формирования запроса.
+ * @returns {string} Сформированный SQL-запрос.
+ */
+function getPersonsSql(settings) {
+    var params = createParamsPersonSql(settings)
 
     return (
         "\n" +
@@ -72,8 +83,8 @@ function getPersonsSql(params) {
         "-- по каждому офису за период \n" +
         "SELECT \n" +
         "    a.office_amdocs_code " +
-        "    " + tabNum + " \n" +
-        "    " + position + " \n" +
+        "    " + params.tabNum + " \n" +
+        "    " + params.position + " \n" +
         "    , a.exp_date \n" +
         "    , sum(duration_vacation) AS duration_vacation \n" +
         "FROM ( \n" +
@@ -82,8 +93,8 @@ function getPersonsSql(params) {
         "       , p.PERSON_NUMBER as line_tab_num \n" +
         "       , case when o.employee_unit LIKE '%пециалист%' \n" +
         "           OR o.employee_unit LIKE '%пециалист' \n" +
-        "           THEN '" + TYPE.sp + "' \n" +
-        "           ELSE '" + TYPE.dm + "' \n" +
+        "           THEN '" + params.type.sp + "' \n" +
+        "           ELSE '" + params.type.dm + "' \n" +
         "       END AS employee_unit --роль 1с \n" +
         "       , date_trunc('month', e.oper_date) " +
                     "+ interval '1 month' - interval '1 day' as exp_date \n" +
@@ -95,18 +106,17 @@ function getPersonsSql(params) {
                             "p.PERSON_NUMBER = o.assigment_number " +
                             "AND e.oper_date = o.oper_date \n" +
         "   where 1=1  \n" +
-        "   AND e.oper_date >= '" + begin + "' \n" +
-        "   AND e.oper_date <= '" + end + "' \n" +
+        "   AND e.oper_date >= '" + params.begin + "' \n" +
+        "   AND e.oper_date <= '" + params.end + "' \n" +
         "   AND o.usage_mnemonic IN ('Я','ЯОО','ЯВ') " +
-        "   " + whereCodes + " \n" +
         "   --and p.person_number in ('273332') \n" +
         "   GROUP BY \n" +
         "       s.CODE_POINTS_SALE \n" +
         "       ,p.PERSON_NUMBER \n" +
         "       ,case when o.employee_unit LIKE '%пециалист%' \n" +
         "           OR o.employee_unit LIKE '%пециалист' \n" +
-        "           THEN '" + TYPE.sp + "' \n" +
-        "           ELSE '" + TYPE.dm + "' \n" +
+        "           THEN '" + params.type.sp + "' \n" +
+        "           ELSE '" + params.type.dm + "' \n" +
         "       END \n" +
         "       ,date_trunc('month', e.oper_date) " +
                 "+ interval '1 month' " +
@@ -114,8 +124,8 @@ function getPersonsSql(params) {
         ") a \n" +
         "GROUP BY \n" +
         "a.office_amdocs_code " +
-        "" + tabNum + " \n" +
-        "" + position + " \n" +
+        "" + params.tabNum + " \n" +
+        "" + params.position + " \n" +
         ",a.exp_date"
     )
 }
@@ -725,14 +735,22 @@ function setDataPerson(result, person, params) {
     return result
 }
 
+/**
+ * Получает информацию о сотруднике по его коду.
+ * @param {string} code - Уникальный код сотрудника.
+ * @returns {object|null} Объект с id и кодом подразделения сотрудника, или null.
+ */
 function getPersonId(code) {
     var query = (
         "\n" +
-        "SELECT id \n" +
-        "FROM collaborators \n" +
-        "WHERE is_dismiss = 0 \n" +
-        "    AND code = " + SqlLiteral(code)
+        "SELECT cs.id, ss.code AS subdivision_code \n" +
+        "FROM collaborators AS cs \n" +
+        "LEFT JOIN subdivisions AS ss ON ss.id = cs.position_parent_id \n" +
+        "WHERE cs.is_dismiss = 0 \n" +
+        "    AND cs.code = " + SqlLiteral(code)
     )
+    addLog(query)
+
     var persons = XQuery("sql: " + query)
     if (ArrayOptFirstElem(persons) == undefined) {
         addLog(query)
@@ -744,7 +762,7 @@ function getPersonId(code) {
         return null
     }
 
-    return ArrayOptFirstElem(persons).id
+    return ArrayOptFirstElem(persons)
 }
 
 /**
@@ -777,6 +795,30 @@ function isAdaptation(person_id, program_id) {
 }
 
 /**
+ * Проверяет, принадлежит ли сотрудник подразделению из списка.
+ * @param {object} person - Объект сотрудника с кодом подразделения.
+ * @param {object} params - Объект с полем `codes` (список кодов подразделений).
+ * @returns {boolean} `true` если код подразделения найден, иначе `false`.
+ */
+function isSubdivision(person, params) {
+    if (params.codes == null) {
+        return false
+    }
+
+    var sub = person.subdivision_code
+    if (params.codes.GetOptProperty(sub) != undefined) {
+        return true
+    }
+
+    var subWithoutOffice = StrReplace(sub, "Office_", "")
+    if (params.codes.GetOptProperty(subWithoutOffice) != undefined) {
+        return true
+    }
+
+    return false
+}
+
+/**
  * Создает адаптации на основе предоставленных метрик.
  * @param {object} metrics - Объект с метриками по коду сотрудника.
  * @param {object} params - Параметры выполнения функции.
@@ -789,35 +831,36 @@ function createAdaptations(metrics, positions, params) {
         throw "Треки обучения не назначены: на заданы параметры назначения."
     }
 
-    var personCode, personId, education
+    var messages = []
+
+    var personCode, person, education
     for (personCode in metrics) {
         addLog(" ")
         addLog(" ")
-        personId = getPersonId(personCode)
-        addLog("Сотрудник: " + personCode)
-        //personId = 7147583355778132228
-        //personId = 6188032376454057749
-        if (personId == null) {
+        person = getPersonId(personCode)
+        addLog("Сотрудник: " + personCode + " " + tools.object_to_text(person, "json"))
+        if (person == null) {
             addLog("Сотрудник не найден, уволен или их найдено несколько.")
             continue
         }
-        addLog("personId: " + personId)
 
         metricsOfPerson = metrics.GetOptProperty(personCode, null)
         if (metricsOfPerson == null) {
             addLog("Отсутствует метрика.")
             continue
         }
-        addLog("metricsOfPerson: " + tools.object_to_text(metricsOfPerson, 'json'))
 
-        if ( isAdaptation(personId, program.def_progr_id) ) {
+        if ( isAdaptation(person.id, program.def_progr_id) ) {
             addLog("Адаптация была назначена ранее.")
             continue
         }
 
-        addLog(tools.object_to_text(metricsOfPerson.result, "json"))
+        if ( !isSubdivision(person, params) ) {
+            addLog("Подразделение не подходит для назначения")
+            continue
+        }
 
-        //education = ADAPTATION.createAdaptation(personId, {
+        //education = ADAPTATION.createAdaptation(person.id, {
         //    defaultProgId: program.def_progr_id,
         //    metrics: metricsOfPerson.result,
         //    adaptationDuration: program.duration,
@@ -827,13 +870,24 @@ function createAdaptations(metrics, positions, params) {
         //result.push(education)
         //addLog("Адаптация: " + tools.object_to_text(education, 'json'))
 
-        addLog(personId + " - " + personCode + " - " + positions[personCode])
-        sendMessage(personId, positions[personCode])
+        education = ADAPTATION.createAdaptation(7147583355778132228, {
+            defaultProgId: program.def_progr_id,
+            metrics: metricsOfPerson.result,
+            adaptationDuration: program.duration,
+            limit: program.limit,
+        })
+
+        messages.push({
+            person: person.id,
+            position: positions[personCode],
+            education: education,
+        })
+        //addLog(person.id + " - " + personCode + " - " + positions[personCode])
         break
     }
 
-    addLog(" ")
-    addLog(" ")
+    addLog("messages: " + tools.object_to_text(messages, "json"))
+    sendMessages(messages)
 
     return result
 }
@@ -844,28 +898,88 @@ function createAdaptations(metrics, positions, params) {
  * @param {string} type
  * @returns {array}
  */
-function getBosses(person, type) {
+function getBosses(bosses, person, type) {
     var TYPE = getPositionType()
 
-    // для СП ищем ДM
+    // для СП ищем ДM и РГО
     if (type == TYPE.sp) {
         addLog("sp")
         var bosses = RAZUM_LIB.getDmForPerson(person)
         if (ArrayOptFirstElem(bosses) == undefined) {
-            return []
+            //return []
         }
 
         // преобразовать массив объектов в массив идентификаторов по полю id
-        return RAZUM_LIB.mapArray(bosses, "id")
+        //return RAZUM_LIB.mapArray(bosses, "id")
     }
 
     // для ДМ ищем РГО
     if (type == TYPE.dm) {
         addLog("dm")
-        return RAZUM_LIB.getRgoFromPerson(person)
+        //return RAZUM_LIB.getRgoFromPerson(person)
     }
 
-    return []
+    return bosses
+}
+
+/**
+ * Получает массив имен этапов из карточки.
+ * @param {object} card - Карточка, содержащая задачи.
+ * @returns {string[]} Массив имен этапов.
+ */
+function getStages(card) {
+    var where = 'This.type == "stage" && String(This.parent_task_id) == ""'
+    var stages = ArraySelect(card.tasks, where)
+
+    var result = []
+
+    var stage
+    for (stage in stages) {
+        result.push(stage.name.Value)
+    }
+
+    return result
+}
+
+function getPersonMessage(message) {
+    var card = message.education.data.card.TopElem
+    var stages = getStages(card)
+    var link = "https://bu-online.beeline.ru/view_doc.html?mode=personal_sp"
+
+    addLog(tools.object_to_text(message, "json"))
+    addLog(tools.object_to_text(card, "json"))
+    return (
+        "<div>Привет, коллега!</div><br>" +
+        "<div>На основании анализа результатов личных продаж по категории " +
+        stages.join(", ") + ", " +
+        "а также твоего предыдущего опыта и стажа работы, " +
+        "мы назначили индивидуальный трек обучения.</div><br>" +
+        "<div>Он поможет тебе достичь лучших результатов " +
+        "в продажах этих продуктов.</div>" +
+        "<div>Пройди обучение до " +
+        StrDate(card.plan_readiness_date, false, false) + " " +
+        "по ссылке: " + link + " " + "</div><br>" +
+        "По вопросам можно обратиться к специалистам по обучению вашего филиала."
+    )
+}
+
+function sendPerson(message) {
+    var portal = "https://bu-online.beeline.ru/"
+    var img = "download_file.html?file_id=7243682474121156596"
+    var html = getPersonMessage(message)
+
+    var notification = {
+        subject: "Назначение прсонализированного обучения",
+        html: html,
+        banner: {
+            type: "yellow",
+            image: portal + img,
+            title: "Персональное обучение",
+        }
+    }
+
+    NOTIFICATION.sendNotification(7147583355778132228, notification)
+    //NOTIFICATION.sendNotification(message.person, notification)
 }
 
 /**
@@ -873,31 +987,24 @@ function getBosses(person, type) {
  * @param {string} personId - Идентификатор сотрудника для отправки уведомления.
  * @param {string} type - Тип, согласно которому определяются руководители
  */
-function sendMessage(personId, type) {
-    var portal = "https://bu-online.beeline.ru/"
-    var img = "download_file.html?file_id=7243682474121156596"
-    var notification = {
-        subject: "Персональное обучение",
-        html: (
-            "<div>Привет!</div>" +
-            "<div>Тестовое уведомление по персональному обучению</div>"
-        ),
-        banner: {
-            type: "yellow",
-            image: portal + img,
-            title: "Персональное обучение",
-        }
-    }
-    //NOTIFICATION.sendNotification(personId, notification)
+function sendMessages(messages) {
+    //var bosses = {}
 
-    var bosses = getBosses(personId, type)
-    addLog("bosses: " + tools.object_to_text(bosses, "json"))
+    var message
+    for (message in messages) {
+        sendPerson(message)
 
-    var boss
-    for (boss in bosses) {
-        addLog("boss: " + boss)
-        //NOTIFICATION.sendNotification(personId, notification)
+        //bosses = getBosses(bosses, personId, message.position)
     }
+
+    //var bosses = getBosses(personId, type)
+    //addLog("bosses: " + tools.object_to_text(bosses, "json"))
+
+    //var boss
+    //for (boss in bosses) {
+    //    addLog("boss: " + boss)
+    //    //NOTIFICATION.sendNotification(boss, notification)
+    //}
 }
 
 /**
@@ -1258,6 +1365,35 @@ function getLastMonth(now) {
 }
 
 /**
+ * Обрабатывает строку JSON из Param.subs и преобразовывает ее в объект
+ * @returns {object|null} Объект, где ключами являются код подразделения.
+ */
+function getSubs() {
+    var sSubs = Trim(Param.subs)
+    if (sSubs == "") {
+        return null
+    }
+
+    var subs = []
+    try {
+        subs = ParseJson(sSubs)
+    } catch(err) {}
+
+    if (ArrayOptFirstElem(subs) == undefined) {
+        return null
+    }
+
+    var result = {}
+
+    var sub
+    for (sub in subs) {
+        result[sub] = { code: sub, }
+    }
+
+    return result
+}
+
+/**
  * Формирует параметры для получения метрик и отчетов.
  * @param {Date} dateData - Дата для определения отчетного периода.
  * @returns {object}
@@ -1290,8 +1426,10 @@ function createParams(dateData) {
         type: "subdivision",
     })
 
+    var subs = getSubs()
 
     return {
+        codes: subs,
         begin: begin,
         end: end,
         list_of_metrics: LIST_OF_METRICS,
@@ -1323,7 +1461,7 @@ try {
     var params = createParams(Date())
 
     main({
-        codes: Param.subs,
+        codes: params.codes,
         begin: params.begin,
         end: params.end,
         list_of_metrics: params.list_of_metrics,
