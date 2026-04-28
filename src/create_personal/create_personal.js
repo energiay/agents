@@ -741,10 +741,11 @@ function setDataPerson(result, person, params) {
  * @param {string} code - Уникальный код сотрудника.
  * @returns {object|null} Объект с id и кодом подразделения сотрудника, или null.
  */
-function getPersonId(code) {
+function getPerson(code) {
     var query = (
         "\n" +
-        "SELECT cs.id, ss.code AS subdivision_code \n" +
+        "\n" +
+        "SELECT cs.id, cs.fullname, ss.code AS subdivision_code \n" +
         "FROM collaborators AS cs \n" +
         "LEFT JOIN subdivisions AS ss ON ss.id = cs.position_parent_id \n" +
         "WHERE cs.is_dismiss = 0 \n" +
@@ -798,21 +799,17 @@ function isAdaptation(person_id, program_id) {
 /**
  * Проверяет, принадлежит ли сотрудник подразделению из списка.
  * @param {object} person - Объект сотрудника с кодом подразделения.
- * @param {object} params - Объект с полем `codes` (список кодов подразделений).
+ * @param {object} codes - Объект с полем `codes` (список кодов подразделений).
  * @returns {boolean} `true` если код подразделения найден, иначе `false`.
  */
-function isSubdivision(person, params) {
-    if (params.codes == null) {
-        return false
-    }
-
+function isSubdivision(person, codes) {
     var sub = person.subdivision_code
-    if (params.codes.GetOptProperty(sub) != undefined) {
+    if (codes.GetOptProperty(sub) != undefined) {
         return true
     }
 
     var subWithoutOffice = StrReplace(sub, "Office_", "")
-    if (params.codes.GetOptProperty(subWithoutOffice) != undefined) {
+    if (codes.GetOptProperty(subWithoutOffice) != undefined) {
         return true
     }
 
@@ -837,8 +834,7 @@ function createAdaptations(metrics, positions, params) {
     var personCode, person, education
     for (personCode in metrics) {
         addLog(" ")
-        addLog(" ")
-        person = getPersonId(personCode)
+        person = getPerson(personCode)
         addLog("Сотрудник: " + personCode + " " + tools.object_to_text(person, "json"))
         if (person == null) {
             addLog("Сотрудник не найден, уволен или их найдено несколько.")
@@ -856,7 +852,7 @@ function createAdaptations(metrics, positions, params) {
             continue
         }
 
-        if ( !isSubdivision(person, params) ) {
+        if (params.codes != null && !isSubdivision(person, params.codes)) {
             addLog("Подразделение не подходит для назначения")
             continue
         }
@@ -878,12 +874,13 @@ function createAdaptations(metrics, positions, params) {
             limit: program.limit,
         })
 
+        result.push(education)
+
         messages.push({
-            person_id: person.id,
+            person: person,
             position: positions[personCode],
             education: education,
         })
-        //addLog(person.id + " - " + personCode + " - " + positions[personCode])
         break
     }
 
@@ -913,7 +910,7 @@ function getStages(card) {
 }
 
 /**
- * Формирует персонализированное HTML-сообщение об учебном треке.
+ * Формирует персонализированное HTML-сообщение о назначенном учебном треке.
  * @param {object} message - Параметры для сообщения
  * @returns {string} HTML-строка с персонализированным сообщением.
  */
@@ -949,6 +946,162 @@ function getPersonMessage(message) {
 }
 
 /**
+ * Формирует список HTML-строк с информацией о людях из сообщения.
+ * Каждая строка содержит ссылку на профиль и дату готовности плана.
+ * @param {object} message - Объект сообщения, содержащий список людей.
+ * @returns {Array<string>} Массив HTML-строк с данными о людях.
+ */
+function getMsgPersons(message) {
+    var persons = []
+    var person, card, id, stages
+    for (person in message.persons) {
+        id = person.education.data.id
+        card = person.education.data.card.TopElem
+        stages = getStages(card)
+
+        persons.push(
+            "<a href=\"" + link + id + "\">" + person.fullname + "</a> " +
+            "до " + StrDate(card.plan_readiness_date, false, false) + ", " +
+            "темы: " + stages.join(", ")
+        )
+    }
+
+    return persons
+}
+
+/**
+ * Формирует HTML-сообщение о назначенном учебном треке сотрудникам (для ДМ).
+ * @param {object} message - Параметры для сообщения
+ * @returns {string} HTML-строка с персонализированным сообщением.
+ */
+function getDmMessage(message) {
+    var domain = "https://bu-online.beeline.ru"
+    var link = domain + "/view_doc.html?mode=razum_dm#employees/"
+    var persons = getMsgPersons(message)
+
+    // ссылка на почту и buzz Лены Чеботаревой
+    var email = "mailto:EAChebotareva@beeline.ru"
+    var buzz = (
+        "https://link.buzz.beeline.ru/open/profile/" +
+        "68395bac-8d0d-5ec4-8c85-20c3c919b97f?" +
+        "ets_id=08c2c31b-bf8a-5c45-80e3-8fef2e745d60"
+    )
+
+    return (
+        "<div>Привет, коллега!</div>" +
+        "<br>" +
+        "<div>На основании анализа результатов личных продаж, " +
+        "а также предыдущего опыта и стажа работы, сотрудникам: " +
+        "<ul>" +
+        "   <li>" + persons.join("</li><li>") + "</li>\n" +
+        "</ul>" +
+        "назначен индивидуальный трек обучения. " +
+        "Он поможет вашему офису достичь лучших результатов в продажах." +
+        "</div>" +
+        "<br>" +
+        "<div>Проконтролировать прохождение можно по ссылке: " + link + "</div>" +
+        "<br>" +
+        "<div>По вопросам можно обратиться к Лене Чеботаревой в " +
+        "<a href=\"" + email + "\">почту</a> или " +
+        "<a href=\"" + buzz + "\">Buzz</a>.</div>"
+        //"<div>По вопросам можно обратиться к специалистам по " +
+        //"обучению вашего филиала.</div>" +
+        //"<div>*пока крайняя дата у всех одинаковая " +
+        //"– когда что-то изменится – поменяем текст.</div>"
+    )
+}
+
+/**
+ * Формирует HTML-сообщение о назначенном учебном треке сотрудникам группы.
+ * @param {object} message - Параметры для сообщения
+ * @returns {string} HTML-строка с персонализированным сообщением.
+ */
+function getRgoMessage(message) {
+    var link = "https://bu-online.beeline.ru/view_doc.html?mode=boss_personal_lk"
+    var count = ArrayCount(message.persons)
+
+    // ссылка на почту и buzz Лены Чеботаревой
+    var email = "mailto:EAChebotareva@beeline.ru"
+    var buzz = (
+        "https://link.buzz.beeline.ru/open/profile/" +
+        "68395bac-8d0d-5ec4-8c85-20c3c919b97f?" +
+        "ets_id=08c2c31b-bf8a-5c45-80e3-8fef2e745d60"
+    )
+
+    return (
+        "<div>Привет, коллега!</div>" +
+        "<br>" +
+        "<div>На основании анализа результатов личных продаж и опыта, " +
+        count + " " +
+        "сотрудникам твоей группы назначен трек обучения, " +
+        "нацеленный на увеличение знаний о продукте " +
+        "и усиление навыков продаж. </div>" +
+        "<br>" +
+        "<div>Проконтролировать прохождение можно по ссылке: " + link + "</div>" +
+        "<br>" +
+        "По вопросам можно обратиться к Лене Чеботаревой в " +
+        "<a href=\"" + email + "\">почту</a> или " +
+        "<a href=\"" + buzz + "\">Buzz</a>."
+        //"<div>По вопросам можно обратиться к специалистам " +
+        //"по обучению вашего филиала.</div>"
+    )
+}
+
+
+/**
+ * Получает сообщение босса в зависимости от типа сообщения.
+ * @param {object} message - Объект сообщения с полем type.
+ * @returns {string} Сообщение босса или пустая строка, если тип не распознан.
+ */
+function getBossMessage(message) {
+    var TYPE = getPositionType()
+    var type = message.type
+
+    if (type == TYPE.dm) {
+        return getDmMessage(message)
+    }
+
+    if (type == TYPE.rgo) {
+        return getRgoMessage(message)
+    }
+
+    return ""
+}
+
+/**
+ * Отправляет уведомление руководителю.
+ * @param {string} bossId - Идентификатор получателя уведомления (руководителя).
+ * @param {string} message - Сообщение для формирования HTML-контента уведомления.
+ * @returns {boolean} True при успешной отправке, False в случае ошибки.
+ */
+function sendBoss(bossId, message) {
+    var portal = "https://bu-online.beeline.ru/"
+    var img = "download_file.html?file_id=7243659359850837156"
+
+    var html = getBossMessage(message)
+    if (html == '') {
+        return false
+    }
+
+    var notification = {
+        subject: "Назначение прсонализированного обучения",
+        sender: "АРС <lms@beeline.ru>",
+        html: html,
+        banner: {
+            type: "yellow",
+            image: portal + img,
+            title: "Персональное обучение",
+        }
+    }
+
+    addLog(bossId + " " + tools.object_to_text(message, "json"))
+    NOTIFICATION.sendNotification(7147583355778132228, notification)
+    //NOTIFICATION.sendNotification(bossId, notification)
+
+    return true
+}
+
+/**
  * Отправляет уведомление о персональном обучении.
  * @param {object} message - Данные для создания уведомления.
  */
@@ -959,6 +1112,7 @@ function sendPerson(message) {
 
     var notification = {
         subject: "Назначение прсонализированного обучения",
+        sender: "АРС <lms@beeline.ru>",
         html: html,
         banner: {
             type: "yellow",
@@ -967,49 +1121,100 @@ function sendPerson(message) {
         }
     }
 
+    addLog(message.person.id + " " + tools.object_to_text(message, "json"))
     NOTIFICATION.sendNotification(7147583355778132228, notification)
-    //NOTIFICATION.sendNotification(message.person_id, notification)
+    //NOTIFICATION.sendNotification(message.person.id, notification)
 }
 
-function getDm(bosses, person, type) {
-    var arrOfObject = RAZUM_LIB.getDmForPerson(person)
-    if (ArrayOptFirstElem(arrOfObject) == undefined) {
+/**
+ * Аккумулируем сотрудников по руководителям.
+ * Если руководитель отсутствует создаем его.
+ * @param {object} bosses - объект, где аккумулируются данные
+ * @param {string} id - Идентификатор руководителя.
+ * @param {object} message - Объект с данными о сотруднике и его должности.
+ * @param {string} type - тип руководителя
+ * @returns {object} Обновленный объект, содержащий информацию о руководителях.
+ */
+function addBosses(bosses, id, message, type) {
+    if (bosses.GetOptProperty(id) == undefined) {
+        bosses[id] = {type: type, persons: []}
+    }
+
+    bosses[id].persons.push({
+        id: String(message.person.id),
+        fullname: String(message.person.fullname),
+        type: message.position,
+        education: message.education,
+    })
+
+    return bosses
+}
+
+/**
+ * Аккумулируем сотрудников по руководителям
+ * @param {object} bosses - объект, где аккумулируются данные
+ * @param {object} message - Объект с данными о сотруднике и его должности.
+ * @returns {object} Обновленный объект `bosses`.
+ */
+function getDm(bosses, message) {
+    var listOfDm = RAZUM_LIB.getDmForPerson(message.person.id)
+    if (ArrayOptFirstElem(listOfDm) == undefined) {
         return bosses
     }
 
-    var arrOfId = RAZUM_LIB.mapArray(arrOfObject, "id")
+    var TYPE = getPositionType()
 
-    var boss
-    for (boss in arrOfId) {
-        bosses[boss]
+    var dm, id
+    for (dm in listOfDm) {
+        id = String(dm.id)
+        bosses = addBosses(bosses, id, message, TYPE.dm)
     }
 
     return bosses
 }
 
 /**
- * Получает руководителей для сотрудника по типу.
- * @param {object} person_id - идентификатор сотрудника.
- * @param {string} type
- * @returns {array}
+ * Аккумулируем сотрудников по руководителям
+ * @param {object} bosses - объект, где аккумулируются данные
+ * @param {object} message - Объект с данными о сотруднике и его должности.
+ * @returns {object} Обновленный объект `bosses`.
  */
-function getBosses(bosses, person_id, type) {
+function getRgo(bosses, message) {
+    var listOfRgo = RAZUM_LIB.getRgoFromPerson(message.person.id)
+    if (ArrayOptFirstElem(listOfRgo) == undefined) {
+        return bosses
+    }
+
     var TYPE = getPositionType()
+
+    var rgoId, id
+    for (rgoId in listOfRgo) {
+        id = String(rgoId)
+        bosses = addBosses(bosses, id, message, TYPE.rgo)
+    }
+
+    return bosses
+}
+
+/**
+ * Определяет и возвращает список руководителей на основе позиции сотрудника.
+ * @param {object} bosses - Исходный список руководителей.
+ * @param {object} message - Объект сообщения с полем position.
+ * @returns {object} Обновленный список руководителей.
+ */
+function getBosses(bosses, message) {
+    var TYPE = getPositionType()
+    var type = message.position
 
     // для СП ищем ДM и РГО
     if (type == TYPE.sp) {
-        addLog("sp")
-
-        bosses = getDm(bosses, person, type)
-
-        // преобразовать массив объектов в массив идентификаторов по полю id
-        //return RAZUM_LIB.mapArray(bosses, "id")
+        bosses = getDm(bosses, message)
+        bosses = getRgo(bosses, message)
     }
 
     // для ДМ ищем РГО
     if (type == TYPE.dm) {
-        addLog("dm")
-        //return RAZUM_LIB.getRgoFromPerson(person)
+        bosses = getRgo(bosses, message)
     }
 
     return bosses
@@ -1023,21 +1228,23 @@ function getBosses(bosses, person_id, type) {
 function sendMessages(messages) {
     var bosses = {}
 
+    addLog(" ")
+    addLog("Отправка сообщений сотрудникам, кому назначены программы обучения")
     var message
     for (message in messages) {
+        // отправка сообщения о назначении программы обучения
         sendPerson(message)
 
-        bosses = getBosses(bosses, message.person_id, message.position)
+        // аккумулируем руководителей в переменную `bosses`
+        bosses = getBosses(bosses, message)
     }
 
-    //var bosses = getBosses(personId, type)
-    //addLog("bosses: " + tools.object_to_text(bosses, "json"))
-
-    //var boss
-    //for (boss in bosses) {
-    //    addLog("boss: " + boss)
-    //    //NOTIFICATION.sendNotification(boss, notification)
-    //}
+    addLog(" ")
+    addLog("Отправка сообщений руководителям")
+    var bossId
+    for (bossId in bosses) {
+        sendBoss(bossId, bosses[bossId])
+    }
 }
 
 /**
@@ -1053,6 +1260,8 @@ function main(params) {
     addLog("Создание треков обучения.")
     var positions = metricsOfBranches[2]
     var result = createAdaptations(metricsOfBranches[1], positions, params)
+
+    addLog(" ")
     addLog("Результат создания треков: " + tools.object_to_text(result, 'json'))
 }
 
