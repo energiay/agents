@@ -874,7 +874,6 @@ function createAdaptations(metrics, positions, params) {
             limit: program.limit,
         })
 
-
         // itulinov
         //education = ADAPTATION.createAdaptation(7147583355778132228, {
         //    defaultProgId: program.def_progr_id,
