@@ -152,37 +152,47 @@ function getBranchCode(list) {
 
 /**
  * Вычисляет метрики для подразделения.
- * @param {string} code - Табельный номер сотрудника.
+ * @param {string} code - код офиса.
  * @param {object} branches - Объект с подразделениями.
  * @returns {object|null} Вычисленные метрики или null, если данные отсутствуют.
  */
 function calcBranch(code, branches) {
     var metrics = {}
 
+    // если у сотрудника нет времени отработанного в офисе
+    // или у офиса нет общего отработанного времени
     var data = branches.GetOptProperty(code)
     if (data.person_duration == null || data.branch_duration == null) {
         return null
     }
 
+    // время сотрудника отработанное в офисе
     var time = Real(data.person_duration) / data.branch_duration
-    var weightedAverage = (Real(data.person_duration) * time * 1) / 100
+
+    // средневзвешанные доли
+    var weightedAverage = Real(time * 1) / 100
 
     var metricId, metric, personPlan
     for (metricId in data.metrics) {
+
+        // есть ли у нас факт по офису
         metric = data.metrics[metricId]
         if (metric.branch == null || weightedAverage == null) {
             metrics[metricId] = null
             continue
         }
 
+        // есть ли у нас план по сотруднику
         personPlan = metric.branch * weightedAverage
         if (personPlan == 0 || metric.person == null) {
             metrics[metricId] = 0
             continue
         }
 
+        // на сколько сотрудник выполнил план
         personResult = Real(metric.person) / personPlan
-        metrics[metricId] = (personResult * 100)
+        metrics[metricId] = personResult
+        //metrics[metricId] = (personResult * 100)
     }
 
     return metrics
@@ -857,33 +867,37 @@ function createAdaptations(metrics, positions, params) {
             continue
         }
 
-        //education = ADAPTATION.createAdaptation(person.id, {
-        //    defaultProgId: program.def_progr_id,
-        //    metrics: metricsOfPerson.result,
-        //    adaptationDuration: program.duration,
-        //    limit: program.limit,
-        //})
-
-        //result.push(education)
-        //addLog("Адаптация: " + tools.object_to_text(education, 'json'))
-
-        education = ADAPTATION.createAdaptation(7147583355778132228, {
+        education = ADAPTATION.createAdaptation(person.id, {
             defaultProgId: program.def_progr_id,
             metrics: metricsOfPerson.result,
             adaptationDuration: program.duration,
             limit: program.limit,
         })
 
-        result.push(education)
 
+        // itulinov
+        //education = ADAPTATION.createAdaptation(7147583355778132228, {
+        //    defaultProgId: program.def_progr_id,
+        //    metrics: metricsOfPerson.result,
+        //    adaptationDuration: program.duration,
+        //    limit: program.limit,
+        //})
+
+        result.push(education)
+        if (!education.success) {
+            addLog(education.error)
+            continue
+        }
+
+        addLog("Адаптация: " + tools.object_to_text(education, 'json'))
         messages.push({
             person: person,
             position: positions[personCode],
             education: education,
         })
-        break
     }
 
+    addLog(" ")
     addLog("messages: " + tools.object_to_text(messages, "json"))
     sendMessages(messages)
 
@@ -999,7 +1013,7 @@ function getDmMessage(message) {
         "Он поможет вашему офису достичь лучших результатов в продажах." +
         "</div>" +
         "<br>" +
-        "<div>Проконтролировать прохождение можно по ссылке: " + link + "</div>" +
+        "<div>Проконтролировать прохождение можно по <a href=\"" + link + "\">ссылке<a></div>" +
         "<br>" +
         "<div>По вопросам можно обратиться к Лене Чеботаревой в " +
         "<a href=\"" + email + "\">почту</a> или " +
@@ -1095,8 +1109,11 @@ function sendBoss(bossId, message) {
     }
 
     addLog(bossId + " " + tools.object_to_text(message, "json"))
-    NOTIFICATION.sendNotification(7147583355778132228, notification)
-    //NOTIFICATION.sendNotification(bossId, notification)
+
+    // itulinov
+    //NOTIFICATION.sendNotification(7147583355778132228, notification)
+
+    NOTIFICATION.sendNotification(bossId, notification)
 
     return true
 }
@@ -1122,8 +1139,11 @@ function sendPerson(message) {
     }
 
     addLog(message.person.id + " " + tools.object_to_text(message, "json"))
-    NOTIFICATION.sendNotification(7147583355778132228, notification)
-    //NOTIFICATION.sendNotification(message.person.id, notification)
+
+    //itulinov
+    //NOTIFICATION.sendNotification(7147583355778132228, notification)
+
+    NOTIFICATION.sendNotification(message.person.id, notification)
 }
 
 /**
@@ -1712,7 +1732,7 @@ try {
         filial_duration: params.subs_duration,
         program: {
             def_progr_id: 7231245838301082062, // TODO: программа для назначения
-            duration: 7, // TODO: продолжительность назначенной программы в днях
+            duration: 10, // TODO: продолжительность назначенной программы в днях
             limit: 2, // TODO: сколько активностей назначать из программы
         }
     })
